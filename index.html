@@ -191,6 +191,11 @@
       .tag.teal{background:var(--teal-soft);color:var(--teal)}
       .tag.gold{background:var(--gold-soft);color:var(--gold)}
 
+      /* ---------- 추가 행동: 집 사고팔기 ---------- */
+      .extra-trade{margin-top:16px;background:var(--accent-soft);border:1px solid var(--line);border-radius:12px;padding:16px}
+      .extra-trade-head{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+      .extra-trade-head .t{font-weight:600;font-size:16px;color:var(--ink)}
+
       /* ---------- result ---------- */
       .result-hero{text-align:center;padding:8px 0 8px}
       .result-hero .delta{font-family:var(--font);font-size:clamp(32px,6vw,40px);font-weight:700;letter-spacing:-.03em;line-height:1.25}
@@ -508,6 +513,44 @@
       return {rate:5.0,kospi:1028,unemp:6.3,cpi:0.8,real:false};
     }
     function kospiAt(y){ return macro(y).kospi; }
+    /* ---------- 투자 상품별 연 수익률 (%) — 실제 지수·시세의 연말 기준 연간 변동률 (게임용 근사) ----------
+       나스닥: NASDAQ Composite 연말 종가 · 코스닥: KRX 코스닥 지수 연말값 · 채권: 국고채 지수 총수익률(KAP) 근사
+       금: LBMA 국제 금 가격 연말 기준 · 비트코인: CoinMarketCap 연말 달러 가격 (거래가 본격화한 2013년부터)
+       2025년 이후는 실제 통계가 없어 아래 장기 평균 가정값을 쓰고, 정산 로그에 가정임을 표시한다 */
+    const PROD_RET = {
+      nasdaq:{ 1999:85.6,2000:-39.3,2001:-21.1,2002:-31.5,2003:50.0,2004:8.6,2005:1.4,2006:9.5,2007:9.8,2008:-40.5,2009:43.9,2010:16.9,2011:-1.8,2012:15.9,2013:38.3,2014:13.4,2015:5.7,2016:7.5,2017:28.2,2018:-3.9,2019:35.2,2020:43.6,2021:21.4,2022:-33.1,2023:43.4,2024:28.6 },
+      kosdaq:{ 1999:92.0,2000:-79.4,2001:36.9,2002:-33.8,2003:1.7,2004:-14.5,2005:62.8,2006:-16.7,2007:4.5,2008:-52.7,2009:54.6,2010:2.7,2011:-1.9,2012:-0.8,2013:0.8,2014:8.6,2015:25.7,2016:-7.5,2017:26.4,2018:-15.4,2019:-0.9,2020:44.6,2021:7.2,2022:-34.6,2023:27.6,2024:-17.2 },
+      bond:{ 1999:6.0,2000:3.0,2001:7.0,2002:8.0,2003:4.0,2004:6.0,2005:2.0,2006:3.0,2007:4.0,2008:10.0,2009:4.5,2010:7.0,2011:6.0,2012:6.5,2013:1.0,2014:7.5,2015:3.5,2016:2.5,2017:0.5,2018:4.5,2019:5.0,2020:4.0,2021:-1.5,2022:-6.0,2023:5.5,2024:6.0 },
+      gold:{ 1999:-0.3,2000:-5.5,2001:2.7,2002:24.8,2003:19.9,2004:5.2,2005:18.1,2006:23.2,2007:30.9,2008:5.6,2009:24.4,2010:29.5,2011:10.1,2012:7.1,2013:-28.0,2014:-1.5,2015:-10.4,2016:8.6,2017:13.1,2018:-1.6,2019:18.3,2020:25.1,2021:-3.6,2022:-0.3,2023:13.1,2024:27.2 },
+      bitcoin:{ 2013:5379,2014:-58,2015:35,2016:124,2017:1375,2018:-73,2019:94,2020:303,2021:60,2022:-64,2023:156,2024:121 }
+    };
+    const PROD_ASSUMED = { nasdaq:9, kosdaq:5, bond:3, gold:6, bitcoin:20 }; // 2025년 이후 가정 연 수익률(%)
+    const PRODUCTS = {
+      nasdaq:{ name:"나스닥 ETF", src:"나스닥 종합지수(NASDAQ Composite) 연말 종가 기준" },
+      kosdaq:{ name:"코스닥 ETF", src:"KRX 코스닥 지수 연말값 기준" },
+      bond:{ name:"채권 ETF", src:"국고채 지수 총수익률(KAP)·한국은행 국고채 금리 기준" },
+      gold:{ name:"금 ETF", src:"국제 금 시세(LBMA) 연말 가격 기준" },
+      bitcoin:{ name:"비트코인", src:"비트코인 연말 달러 가격(CoinMarketCap) 기준" },
+      theme:{ name:"테마주", src:"KRX KOSPI 지수 변동의 1.7배로 근사 (개별 테마주의 초과 변동성)" },
+      altcoin:{ name:"알트코인", src:"비트코인 수익률의 1.45제곱으로 근사 (알트코인의 초과 변동성)" }
+    };
+    function productLabel(id){ return PRODUCTS[id] ? PRODUCTS[id].name : ""; }
+    function fmtRatePct(r){ const v = Math.round(r*10)/10; return (v>0?"+":"") + v.toLocaleString() + "%"; }
+    /* 상품별 1년 수익 배율. 세부 상품을 안 골랐으면 null을 돌려 기존 KOSPI 정산을 그대로 쓴다 */
+    function productFactor(id, y){
+      if (!id || !PRODUCTS[id]) return null;
+      if (id === "theme"){ const f = Math.pow(kospiAt(y)/kospiAt(y-1), 1.7); return { factor:f, ratePct:(f-1)*100, src:PRODUCTS.theme.src, assumed:y>=2025 }; }
+      if (id === "altcoin"){
+        const b = PROD_RET.bitcoin[y];
+        if (b != null){ const f = Math.max(0.02, Math.pow(1 + b/100, 1.45)); return { factor:f, ratePct:(f-1)*100, src:PRODUCTS.altcoin.src, assumed:false }; }
+        if (y >= 2025){ const f = Math.pow(1 + PROD_ASSUMED.bitcoin/100, 1.45); return { factor:f, ratePct:(f-1)*100, src:PRODUCTS.altcoin.src, assumed:true }; }
+        const f = Math.pow(kospiAt(y)/kospiAt(y-1), 2.2); return { factor:f, ratePct:(f-1)*100, src:"2013년 이전에는 알트코인 시장 데이터가 없어 KOSPI 지수 변동의 2.2제곱으로 대체한 게임 내 가정", assumed:true };
+      }
+      const table = PROD_RET[id];
+      if (table && table[y] != null) return { factor:1 + table[y]/100, ratePct:table[y], src:PRODUCTS[id].src, assumed:false };
+      if (y >= 2025) return { factor:1 + PROD_ASSUMED[id]/100, ratePct:PROD_ASSUMED[id], src:PRODUCTS[id].src, assumed:true };
+      return null;
+    }
     // 대기업 대졸 초임(연봉, 만원) 대표값 앵커
     const SALARY_ANCHORS = [[1999,1750],[2002,2250],[2005,2800],[2008,3250],[2010,3550],[2013,3850],[2016,4100],[2019,4500],[2021,4800],[2024,5300]];
     function bigCorpSalary(year){
@@ -516,6 +559,11 @@
       for (let i=1;i<A.length;i++){ if (year<=A[i][0]){ const [x0,y0]=A[i-1],[x1,y1]=A[i]; return y0+(y1-y0)*(year-x0)/(x1-x0); } }
       return A[A.length-1][1]*Math.pow(1.03,year-A[A.length-1][0]);
     }
+    /* ---------- 전문직·선수 소득 (2024년 기준 만원, 게임용 근사) ----------
+       의사·치과의사·변호사는 국세청 2024년 귀속 종합소득세 신고 기준 개인사업자 평균 사업소득.
+       나머지는 업계 분포 기반 게임용 근사. 연도별로는 대기업 초임의 연도별 흐름 비율로 스케일링한다 */
+    const PROF_BASE_2024 = { doctor:40200, dentist:22200, lawyer:10600, accountant:9000, sportStar:30000, proAthlete:9000, sportsCoach:5500, gamerStar:25000, gamerPro:7000, gamerAfter:6000 };
+    function profIncome(kind, year){ return PROF_BASE_2024[kind] * bigCorpSalary(year) / bigCorpSalary(2024); }
     // 아파트 단지: 전용 84㎡ 대표 거래가 앵커(만원) — 국토부 실거래가·KB시세 근사
     const APTS = [
       {id:"eunma", name:"은마아파트", gu:"서울 강남구 대치동", region:"서울", built:1979, lat:37.4983, lng:127.0656,
@@ -601,7 +649,7 @@
     const app = document.getElementById("app");
     const hud = document.getElementById("hud");
     let S = null;
-    const STAGE_AGES = [19,23,26,29,31,34,39,44,49,55];
+    const STAGE_AGES = [14,16,18,19,21,23,25,26,29,31,33,34,36,39,42,44,47,49,52,55];
     function curYear(){ return S.birth + S.age; }
     function aptById(id){ return APTS.find(a=>a.id===id); }
     function houseValue(){ return S.house ? aptPriceAt(aptById(S.house.aptId), curYear()) : 0; }
@@ -699,7 +747,7 @@
       net.style.color = netWorth() < 0 ? "var(--up)" : "var(--ink)";
       const chips = [];
       chips.push(`현금 <b>${fmtShort(S.cash)}</b>`);
-      if (S.invest > 1) chips.push(`투자 <b>${fmtShort(S.invest)}</b>`);
+      if (S.invest > 1) chips.push(`투자${S.invProduct ? " · " + productLabel(S.invProduct) : ""} <b>${fmtShort(S.invest)}</b>`);
       if (S.house) chips.push(`주택 <b>${fmtShort(houseValue())}</b>`);
       else if (S.jeonse > 1) chips.push(`전세보증금 <b>${fmtShort(S.jeonse)}</b>`);
       if (extraValue() > 1) chips.push(`투자부동산 <b>${fmtShort(extraValue())}</b>`);
@@ -714,6 +762,8 @@
     /* 연 단위 정산: 소득·저축·투자(KOSPI 실제 지수)·예금이자·대출상환 */
     function simulateYears(toAge){
       const logs = [];
+      const prodLines = []; // 세부 투자 상품을 골랐을 때의 연도별 상품 정산 줄
+      const careerLines = []; // 전문직·선수 커리어 구간 전환(전문의 취득, 선수 은퇴 등) 안내 줄
       const startAge = S.age, startYear = curYear();
       let invStart = S.invest, houseStart = houseValue();
       let loanPaidYears = 0, loanPaidTotal = 0; // 이 구간에 실제로 빠져나간 주담대 원리금 (정산 로그용)
@@ -724,32 +774,57 @@
           // 임금곡선: 40세까지 가파르고, 50대 정체, 임금피크 이후 하락 (고용노동부 연령별 임금곡선 근사)
           const g = S.age <= 40 ? 1.032 : S.age <= 50 ? 1.016 : S.age <= 57 ? 1.0 : 0.97;
           S.salary *= g;
+          // 전문직·선수 커리어의 구간 전환: 전공의 종료 후 전문의 소득으로 점프, 선수 은퇴 후 지도자·일반직 소득으로 조정
+          if (S.job === "doctor" && S.age === 32 && !S.flags.specialist){ S.flags.specialist = true; S.salary = Math.round(profIncome("doctor", y)); careerLines.push({cls:"good", text:`전문의 취득 — 연 소득이 ${fmt(S.salary)} 수준으로 점프했습니다 (국세청 2024년 의사 평균 사업소득 4억 200만원 기준, 연도별 스케일링)`}); }
+          if (S.job === "dentist" && S.age === 31 && !S.flags.specialist){ S.flags.specialist = true; S.salary = Math.round(profIncome("dentist", y)); careerLines.push({cls:"good", text:`치과의사 개원 안정화 — 연 소득이 ${fmt(S.salary)} 수준으로 올랐습니다 (국세청 2024년 치과의사 평균 사업소득 2억 2,200만원 기준, 연도별 스케일링)`}); }
+          if (S.job === "lawyer" && S.age === 32 && !S.flags.profSenior){ S.flags.profSenior = true; S.salary = Math.round(profIncome("lawyer", y)); careerLines.push({cls:"good", text:`변호사 경력이 쌓였습니다 — 연 소득이 ${fmt(S.salary)} 수준으로 올랐습니다 (국세청 2024년 변호사 평균 사업소득 1억 600만원 기준, 연도별 스케일링)`}); }
+          if (S.job === "accountant" && S.age === 32 && !S.flags.profSenior){ S.flags.profSenior = true; S.salary = Math.round(profIncome("accountant", y)); careerLines.push({cls:"good", text:`회계사 시니어 승급 — 연봉이 ${fmt(S.salary)} 수준으로 올랐습니다 (회계법인 평균 연봉 분포 참고, 연도별 스케일링)`}); }
+          if (S.job === "sportStar" && S.age === 36){ S.job = "sportsCoach"; S.salary = Math.round(profIncome("sportsCoach", y)); careerLines.push({cls:"", text:`선수 은퇴 — 체육 지도자로 전향해 연 소득이 ${fmt(S.salary)} 수준으로 조정됐습니다`}); }
+          if (S.job === "proAthlete" && S.age === 34){ S.job = "sportsCoach"; S.salary = Math.round(profIncome("sportsCoach", y)); careerLines.push({cls:"", text:`선수 은퇴 — 트레이너로 전향해 연 소득이 ${fmt(S.salary)} 수준으로 조정됐습니다`}); }
+          if (S.job === "gamerStar" && S.age === 30){ S.job = "gamerAfter"; S.salary = Math.round(profIncome("gamerAfter", y)); careerLines.push({cls:"", text:`프로게이머 은퇴 — 스트리머·코치로 전향해 연 소득이 ${fmt(S.salary)} 수준으로 조정됐습니다`}); }
+          if (S.job === "gamerPro" && S.age === 28){ S.job = "mid"; S.salary = Math.round(bigCorpSalary(y) * 0.75); careerLines.push({cls:"", text:`프로게이머 은퇴 — 일반 취업으로 전향해 연봉이 ${fmt(S.salary)} 수준으로 조정됐습니다`}); }
           let save = S.salary * S.saveRate;
           if (S.married) save *= 1.5; // 맞벌이 가구 저축 여력
           if (S.eduSpendUntil && S.age <= S.eduSpendUntil) save -= 900;
+          if (S.childCostUntil && S.age <= S.childCostUntil) save -= 600; // 육아 돌봄비·부모 부양비 구간
+          if (S.sideIncome && S.age <= (S.sideIncomeUntil || 0)) save += S.sideIncome; // 부업·파트타임 소득 구간
+          if (S.flags.careLeave && S.age === 34) save *= 0.4; // 육아휴직 1년 — 소득 공백 구간
           if (S.studentLoan > 0){ const pay = Math.min(S.studentLoan, 420); S.studentLoan -= pay; save -= pay; }
+          let loanPaidThisYear = 0; // 올해 실제로 빠져나간 주담대 원리금 — 적자 클램프 뒤에 차감해, 원금이 현금 감소분보다 더 갚아지지 않게 한다
           if (S.loan > 0 && S.loanPay > 0){
             const interest = S.loan * S.loanRate;
             const principal = Math.min(S.loan, Math.max(0, S.loanPay - interest));
-            S.loan -= principal; save -= S.loanPay;
-            loanPaidYears++; loanPaidTotal += S.loanPay;
+            loanPaidThisYear = Math.min(S.loanPay, principal + interest); // 최종 상환 연도에는 남은 원리금만큼만 낸다
+            S.loan -= principal;
+            loanPaidYears++; loanPaidTotal += loanPaidThisYear;
             if (S.loanYearsLeft > 0) S.loanYearsLeft--;
             if (S.loan <= 0){ S.loan = 0; S.loanPay = 0; S.loanRate = 0; S.loanTerm = 0; S.loanYearsLeft = 0; S.loanStartYear = 0; }
           }
           if (S.jeonseLoan > 0) save -= S.jeonseLoan * 0.045; // 전세대출 이자만 납부
           save = Math.max(save, -S.salary * 0.2);
+          save -= loanPaidThisYear; // 주담대 상환은 의무 지출이라 클램프 대상이 아니다 — 클램프 뒤에 빼서 상환액과 현금 감소가 항상 일치하게 한다
           const invPart = save > 0 ? save * S.allocInv : 0;
           S.invest += invPart; S.cash += (save - invPart);
         }
         if (S.invest > 0){
-          let r = kospiAt(y) / kospiAt(y-1);
-          if (S.speculative) r = Math.pow(r, 1.7); // 테마주·코인: 지수 변동의 증폭으로 근사
-          S.invest *= r;
+          const pf = productFactor(S.invProduct, y);
+          if (pf){ // 세부 상품을 골랐으면 그 상품의 해당 연도 실제 수익률로 정산하고, 상품 정산 줄을 남긴다
+            const beforeRet = S.invest;
+            S.invest *= pf.factor;
+            prodLines.push({ cls: S.invest >= beforeRet ? "good" : "bad",
+              text:`${productLabel(S.invProduct)} ${y}년 ${fmtRatePct(pf.ratePct)} (투자금 ${fmtShort(beforeRet)} → ${fmtShort(S.invest)})`,
+              stat:`수익률 출처: ${pf.src}${pf.assumed ? " · 이 구간은 실제 통계가 없어 게임 내 가정 수익률로 정산했습니다" : ""}` });
+          } else {
+            let r = kospiAt(y) / kospiAt(y-1);
+            if (S.speculative) r = Math.pow(r, 1.7); // 테마주·코인: 지수 변동의 증폭으로 근사
+            S.invest *= r;
+          }
         }
         if (S.cash > 0) S.cash *= 1 + Math.max(0.004, (m.rate - 0.8) / 100); // 예금금리 ≈ 기준금리 −0.8%p
         else if (S.cash < 0) S.cash *= 1.07; // 마이너스통장 이자
       }
-      if (Math.abs(S.invest - invStart) > 300)
+      if (prodLines.length) logs.push(...prodLines); // 상품 정산 줄이 있으면 기존 KOSPI 요약 줄과 중복되므로 상품 줄만 남긴다
+      else if (Math.abs(S.invest - invStart) > 300)
         logs.push({cls: S.invest >= invStart ? "good" : "bad", text:`투자자산 ${fmtShort(invStart)} → ${fmtShort(S.invest)} (같은 기간 KOSPI ${kospiAt(startYear).toLocaleString()} → ${kospiAt(curYear()).toLocaleString()}pt)`});
       if (S.house && houseStart > 0)
         logs.push({cls: houseValue() >= houseStart ? "good" : "bad", text:`보유 주택 시가 ${fmtShort(houseStart)} → ${fmtShort(houseValue())}`});
@@ -758,6 +833,7 @@
           ? `주담대 원리금 연 ${fmtShort(loanPaidTotal / loanPaidYears)}씩 ${loanPaidYears}년간 자동 상환 — 남은 잔액 ${fmtShort(S.loan)}, 남은 만기 ${S.loanYearsLeft}년`
           : `주담대 원리금을 ${loanPaidYears}년간 자동 상환해 대출을 모두 갚았습니다`,
           stat: worldStatLine(curYear())});
+      logs.push(...careerLines);
       return logs;
     }
 
@@ -820,7 +896,7 @@
         <h1>대한민국 평균 집값 15억</h1>
         <p class="hero-subtitle">내집마련 시뮬레이션</p>
         <div class="rule"></div>
-        <p class="muted" style="max-width:880px;text-wrap:pretty">수능부터 은퇴까지, 열 번의 선택이 당신의 자산을 만듭니다.
+        <p class="muted" style="max-width:880px;text-wrap:pretty">중학교부터 은퇴까지, 스무 번의 선택이 당신의 자산을 만듭니다.
         선택지의 결과는 그해의 <b><span class="nw">실제 기준금리·KOSPI·실업률</span></b>과 <b>단지별 실거래가 흐름</b>으로 계산되고,
         하이라이트는 단 하나의 질문입니다 — <b>몇 살에, 어느 동네의, 어떤 아파트를 살 것인가.</b></p>
         <div class="start-layout">
@@ -1086,7 +1162,7 @@
           <div class="lc-row"><span class="k">출발 자산</span><span class="v num">${fmt(500)} (현금)</span></div>
           <div class="lc-row"><span class="k">부모 지원</span><span class="v">없음 — 출발 자산이 전부</span></div>
           <div class="lc-row"><span class="k">학자금 대출</span><span class="v">없음 (19세 진학 선택에서 결정)</span></div>
-          <div class="lc-row"><span class="k">첫 장면</span><span class="v">19세 · ${birth+19}년, 수능과 진학의 갈림길</span></div>
+          <div class="lc-row"><span class="k">첫 장면</span><span class="v">14세 · ${birth+14}년, 중학교 입학 — 방과후 선택이 진로를 가릅니다</span></div>
           <div class="lc-row"><span class="k">이 세대의 집 사기 난이도</span><span class="v num">30세가 되는 ${birth+30}년 · PIR ${pir30.toFixed(1)}배</span></div>
         </div>
         <p class="small" style="margin-top:12px;text-wrap:pretty">${birth+30}년, 서울 아파트 중위가격은 ${fmt(med30)}이었습니다. PIR ${pir30.toFixed(1)}배 — 월급을 한 푼도 안 쓰고 ${pir30.toFixed(1)}년을 모아야 살 수 있는 가격으로, ${pirDifficulty(pir30)}로 꼽힙니다. 태어난 해가 다르면 이 숫자부터 달라집니다.</p>
@@ -1109,12 +1185,12 @@
 
     function startGame(birth, region){
       stopShowcase();
-      S = { birth, region, nick:DEFAULT_NICK, age:19, stageIdx:0,
+      S = { birth, region, nick:DEFAULT_NICK, age:14, stageIdx:0,
         cash:500, invest:0, jeonse:0, jeonseLoan:0, studentLoan:0,
-        salary:0, job:null, saveRate:0.34, allocInv:0, speculative:false,
+        salary:0, job:null, saveRate:0.34, allocInv:0, speculative:false, invProduct:null,
         house:null, loan:0, loanRate:0, loanPay:0, loanTerm:0, loanYearsLeft:0, loanStartYear:0, extraProp:null,
-        married:false, kids:0, tongjangStart:null, edu:null, eduSpendUntil:0,
-        flags:{}, history:[], shocksShown:{}, settleLog:[], lastYear:birth+18 };
+        married:false, kids:0, tongjangStart:null, edu:null, eduSpendUntil:0, childCostUntil:0, sideIncome:0, sideIncomeUntil:0,
+        flags:{}, history:[], shocksShown:{}, settleLog:[], lastYear:birth+13 };
       hud.classList.remove("hidden");
       armExitGuard();
       updateHUD();
@@ -1131,6 +1207,79 @@
       return Math.min(84, p);
     }
     const STAGES = [
+      { age:14, title:"중학교 입학, 방과후의 선택", kicker:"14세 · 중학교 1학년",
+        desc:()=>"중학교에 입학했습니다. 방과후 시간을 어디에 쓰느냐가 성적과 진로의 방향을 정합니다. 이 선택이 이후에 도전할 수 있는 진로를 가릅니다.",
+        choices:()=>[
+          { t:"공부 — 성적 우수 트랙", d:"공부에 집중해 상위권 성적을 만듭니다. 좋은 대학 진학 가능성이 높아지고, 19세 진학 단계에서 의대·로스쿨에 도전할 수 있습니다.", tag:"학업",
+            apply(){ S.flags.track = "study";
+              return { lines:["성적 우수 트랙 진입 — 상위권 성적을 유지합니다", "19세 진학 단계에서 의대 도전·로스쿨 트랙이 열립니다"], source:"진로 분기는 게임용 단순화 — 실제 진로는 훨씬 다양합니다" }; } },
+          { t:"운동 — 체육 트랙", d:"운동에 재능을 겁니다. 체육 특기생·프로 선수에 도전할 수 있지만, 스포츠 스타가 될 확률은 1~3% 수준으로 낮습니다. 실패해도 지도자·트레이너·체육교사로 진행합니다.", tag:"체육",
+            apply(){ S.flags.track = "sports";
+              return { lines:["체육 트랙 진입 — 특기생 진로를 준비합니다", "프로 도전에 실패해도 체육 지도자·트레이너 경로가 열립니다"], source:"스포츠 스타 도달 확률은 게임용으로 1~3%로 단순화" }; } },
+          { t:"게임 — 프로게이머 트랙", d:"게임 실력을 키웁니다. 프로게이머에 도전할 수 있지만 스타가 될 확률은 1% 미만입니다. 학업 성적이 떨어져 의대·로스쿨 도전은 할 수 없습니다.", tag:"게임",
+            apply(){ S.flags.track = "game";
+              return { lines:["게임 트랙 진입 — 프로게이머 도전을 준비합니다", "학업 성적 하락으로 의대·로스쿨 도전 경로는 닫힙니다"], source:"프로게이머 스타 도달 확률은 게임용으로 1% 미만으로 단순화" }; } },
+        ]},
+      { age:16, title:"중학교 졸업, 어느 고등학교로", kicker:"16세 · 중학교 3학년",
+        desc:()=>"고등학교 진학이 다가옵니다. 14세에 고른 트랙에 맞는 학교를 고르면 다음 도전의 확률이 달라집니다.",
+        choices:()=>{
+          if (S.flags.track === "sports") return [
+            { t:"체육고 · 예체능고 진학", d:"운동에 올인하는 환경. 프로 도전 확률이 오릅니다 (스타 약 3% · 프로 데뷔 약 30% 수준으로 상승).", tag:"체육",
+              apply(){ S.flags.sportsAce = true;
+                return { lines:["체육고 진학 — 전국대회·프로 도전에서 유리해집니다", "대신 학업 트랙은 더 멀어집니다"], source:"체육특기자 진로 구조 (게임용 단순화)" }; } },
+            { t:"일반고 체육부", d:"학업과 병행하며 운동을 이어갑니다. 지도자·체육교사 경로가 안정적이고, 23세 프로 도전에서 데뷔 확률 +5%p 보너스가 붙습니다.", tag:"안정",
+              apply(){ S.flags.sportsSteady = true;
+                return { lines:["일반고 체육부 진학 — 학업 병행으로 진로 폭이 넓습니다", "23세 프로 도전 데뷔 확률 +5%p 보너스 확보"], source:"게임용 단순화" }; } },
+          ];
+          if (S.flags.track === "game") return [
+            { t:"e스포츠 아카데미 병행", d:"일반고에 다니며 프로 지망 아카데미를 병행합니다. 입단 도전 확률이 오릅니다.", tag:"게임",
+              apply(){ S.flags.gameScout = true;
+                return { lines:["아카데미 병행 — 19세 프로 입단 도전 확률이 오릅니다 (프로 데뷔 약 15%)"], source:"e스포츠 아카데미 구조 참고 (게임용 단순화)" }; } },
+            { t:"일반고 · 게임은 취미로", d:"학업을 우선해 성적 하락을 줄입니다. 프로 도전은 19세에 그대로 할 수 있고, 실패해도 인서울 4년제 진학으로 이어집니다.", tag:"안정",
+              apply(){ S.flags.gameBalance = true;
+                return { lines:["학업 우선 — 19세 프로 도전에 실패해도 인서울 4년제 진학으로 이어집니다"], source:"게임용 단순화" }; } },
+          ];
+          return [
+            { t:"특목고 · 자사고 도전", d:"외고·과학고·자사고에 도전합니다. 합격 확률 약 35% (게임용 단순화). 합격하면 성적 최상위권 환경에서 의대·로스쿨 도전이 유리해집니다.", tag:"확률 도전",
+              apply(){ if (Math.random() < 0.35){ S.flags.topGrade = true;
+                  return { lines:["특목고·자사고 합격! 성적 최상위권 환경에 들어갑니다", "19세 의대 도전 합격 확률이 약 30%까지 오릅니다"], source:"특목고·자사고 입시 경쟁 구조 참고 (게임용으로 합격 확률 35%로 단순화)" }; }
+                return { lines:["특목고 도전은 불발 — 일반고로 진학합니다", "일반고 상위권 트랙은 그대로 이어집니다"], source:"특목고·자사고 입시 경쟁 구조 참고 (게임용 단순화)" }; } },
+            { t:"일반고 진학", d:"내신 관리에 유리한 일반고에서 상위권을 노립니다. 의대 도전은 가능하지만 확률은 약 15%입니다.", tag:"안정",
+              apply(){ S.flags.topGrade = false;
+                return { lines:["일반고 진학 — 내신 상위권을 목표로 합니다"], source:"게임용 단순화" }; } },
+          ];
+        }},
+      { age:18, title:"고등학교 3학년, 수능의 해", kicker:"18세 · 고등학교 3학년",
+        desc:()=>"입시가 코앞입니다. 14세에 고른 트랙 안에서 마지막 승부를 걸지, 균형을 잡을지 정합니다.",
+        choices:()=>{
+          if (S.flags.track === "sports") return [
+            { t:"전국대회 출전 도전", d:"입상하면 특기생 진학과 프로 도전에서 유리해집니다. 입상 확률 약 25% (게임용 단순화).", tag:"확률 도전",
+              apply(){ if (Math.random() < 0.25){ S.flags.sportsAce = true;
+                  return { lines:["전국대회 입상! 체육 특기생 진학이 유리해지고, 프로 도전 확률이 오릅니다 (스타 약 3% · 프로 데뷔 약 30%)"], source:"전국대회 입상 확률은 게임용 단순화" }; }
+                return { lines:["입상은 놓쳤지만 실전 경험이 쌓였습니다", "체육 트랙은 그대로 이어집니다"], source:"전국대회 입상 확률은 게임용 단순화" }; } },
+            { t:"기초 체력 · 학업 병행", d:"부상 위험을 줄이고 지도자·체육교사 경로까지 열어둡니다. 23세 프로 도전에서 데뷔 확률 +5%p 보너스가 붙습니다.", tag:"안정",
+              apply(){ S.flags.sportsSteady = true;
+                return { lines:["학업을 병행해 체육 관련 직업 경로가 안정적입니다", "23세 프로 도전에서 데뷔 확률 +5%p 보너스가 붙습니다", "프로 도전은 23세 단계에서 그대로 할 수 있습니다"], source:"게임용 단순화" }; } },
+          ];
+          if (S.flags.track === "game") return [
+            { t:"아마추어 대회 출전", d:"주목받으면 19세 프로 입단 도전 확률이 오릅니다. 주목받을 확률 약 20% (게임용 단순화).", tag:"확률 도전",
+              apply(){ if (Math.random() < 0.20){ S.flags.gameScout = true;
+                  return { lines:["대회에서 주목받았습니다 — 19세 프로 입단 도전 확률이 오릅니다 (프로 데뷔 약 15%)"], source:"아마추어 대회 주목 확률은 게임용 단순화" }; }
+                return { lines:["입상은 놓쳤습니다. 프로 입단 도전은 19세에 그대로 할 수 있습니다"], source:"게임용 단순화" }; } },
+            { t:"학업과 병행", d:"성적 하락을 줄여, 프로 도전에 실패해도 인서울 4년제 진학으로 무리 없이 진행합니다.", tag:"안정",
+              apply(){ S.flags.gameBalance = true;
+                return { lines:["학업을 병행해, 19세 프로 도전에 실패해도 인서울 4년제 진학으로 이어집니다"], source:"게임용 단순화" }; } },
+          ];
+          return [
+            { t:"최상위권 심화 — 의대·로스쿨 목표", d:"성적 최상위권을 유지합니다. 19세 의대 도전 합격 확률이 약 30%까지 오릅니다.", tag:"학업",
+              apply(){ S.flags.topGrade = true;
+                return { lines:["성적 최상위권 유지 — 19세 의대 도전 합격 확률 약 30% (게임용 단순화)"], source:"의대·로스쿨 도전 확률은 게임용 단순화" }; } },
+            { t:"상위권 유지 — 명문대 목표", d:"무리하지 않고 페이스를 지킵니다. 이미 최상위권(특목고 합격 등)이면 그 성적은 그대로 유지되고, 의대 도전 합격 확률은 최상위권 약 30% · 상위권 약 15%입니다.", tag:"학업",
+              apply(){ if (S.flags.topGrade)
+                  return { lines:["무리 없이 컨디션을 관리했습니다 — 특목고에서 만든 성적 최상위권은 그대로 유지됩니다", "19세 의대 도전 합격 확률 약 30% (게임용 단순화)"], source:"의대·로스쿨 도전 확률은 게임용 단순화" };
+                return { lines:["성적 상위권 유지 — 의대 도전 합격 확률 약 15%, 로스쿨 트랙은 그대로 열려 있습니다"], source:"의대·로스쿨 도전 확률은 게임용 단순화" }; } },
+          ];
+        }},
       { age:19, title:"수능, 그리고 진학의 갈림길", kicker:"19세 · 대학 입시",
         desc:()=>`수능 성적표가 도착했습니다. ${curYear()}년 사립대 평균 등록금은 연 ${tuition(curYear()).toLocaleString()}만원 수준. 어떤 출발을 택하시겠습니까?`,
         choices:()=>[
@@ -1150,6 +1299,64 @@
             apply(){ const cost = Math.round(1500*Math.pow(1.03, curYear()-2010)); S.cash -= Math.min(S.cash, cost*0.4); S.studentLoan += Math.round(cost*0.6); S.edu="seoul4"; S.flags.jaesu = true;
               return { lines:[`재수 비용 ${fmt(cost)} (일부는 대출로 충당)`, "인서울 4년제 진학 성공 — 진학 트랙 상승"],
                 source:"사교육비조사(통계청) — 재수 종합반 연 비용 대표값 근사" }; } },
+          ...(S.flags.track==="study" ? [
+          { t:"의대 도전", d:"공부 트랙의 성적 상위권만 도전할 수 있습니다. 실패하면 게임 오버가 아니라 인서울 4년제 일반학과로 진학합니다.", tag:"전문직 · 확률 도전",
+            est: S.flags.topGrade ? "합격 확률 약 30% (성적 최상위권, 게임용 단순화)" : "합격 확률 약 15% (성적 상위권, 게임용 단순화)",
+            apply(){ const p = S.flags.topGrade ? 0.30 : 0.15;
+              if (Math.random() < p){ S.edu="medical"; S.flags.medical = true;
+                const medLoan = Math.round(tuition(curYear())*6*0.6); S.studentLoan += medLoan;
+                return { lines:["의대 합격! 의·치대 전문직 트랙에 진입했습니다", `의대 6년 등록금 — 학자금대출 ${fmt(medLoan)} 발생 (졸업 후 취업 시점부터 연 420만원씩 상환)`, "26세 첫 직장 단계에서 의사·치과의사 경로가 열립니다", "의사 국가고시 합격률은 약 95% 수준이라 이후 수련 진입은 안정적입니다"],
+                  source:"보건복지부 — 의사 국가고시 합격률 약 95% · 의대 도전 합격 확률은 게임용으로 단순화(최상위권 30% · 상위권 15%) · 등록금은 통계청·교육부 대학등록금 통계 근사" }; }
+              S.edu="seoul4"; S.flags.lawTrack = true;
+              const failLoan = Math.round(tuition(curYear())*4*0.6); S.studentLoan += failLoan;
+              return { lines:["의대 도전은 불발 — 인서울 4년제 일반학과로 진학합니다", `학자금대출 ${fmt(failLoan)} 발생 (졸업 후 취업 시점부터 연 420만원씩 상환)`, "로스쿨 트랙에 진입했습니다 — 26세 첫 직장 단계에서 로스쿨 도전이 열립니다", "회계사 같은 다른 전문직 경로도 그대로 남아 있습니다"],
+                source:"의대 도전 합격 확률은 게임용으로 단순화(최상위권 30% · 상위권 15%) · 등록금은 통계청·교육부 대학등록금 통계 근사" }; } },
+          { t:"로스쿨 목표 — 명문대 진학", d:"법학·상경 명문대에 진학해 졸업 후 로스쿨에 도전합니다. 입학·합격 판정은 26세 첫 직장 단계에서 합니다.", tag:"전문직 트랙",
+            apply(){ S.edu="seoul4"; S.flags.lawTrack = true;
+              const lawLoan = Math.round(tuition(curYear())*4*0.6); S.studentLoan += lawLoan;
+              return { lines:["명문대 진학 — 로스쿨 트랙 진입", `학자금대출 ${fmt(lawLoan)} 발생 (졸업 후 취업 시점부터 연 420만원씩 상환)`, "26세 단계에서 로스쿨 도전: 입학 확률 약 20% (경쟁률 약 5.6:1) × 변호사시험 합격 확률 약 50%"],
+                source:"법학전문대학원협의회 — 2024 로스쿨 평균 경쟁률 약 5.6:1 · 법무부 — 변호사시험 합격률 2024년 53.0%, 2025년 52.28% (게임용으로 단순화)" }; } },
+          ] : []),
+          ...(S.flags.track==="sports" ? [
+          { t:"체육 특기생 — 체육대 진학", d:"운동 특기로 체육대학에 진학합니다. 23세 단계에서 프로 선수에 도전할 수 있습니다.", tag:"체육 트랙",
+            apply(){ S.edu="sports";
+              const spoLoan = Math.round(tuition(curYear())*4*0.5); S.studentLoan += spoLoan;
+              return { lines:["체육 특기생으로 체육대 진학", `체육대 등록금 — 학자금대출 ${fmt(spoLoan)} 발생 (졸업 후 취업 시점부터 연 420만원씩 상환)`, "23세 단계에서 프로 선수 도전이 열립니다"], source:"대학 체육특기자 전형 (게임용 단순화) · 등록금은 통계청·교육부 대학등록금 통계 근사" }; } },
+          ] : []),
+          ...(S.flags.track==="game" ? [
+          { t:"프로게이머 도전", d:"페이커급 스타가 될 확률은 1% 미만, 프로 데뷔 확률도 낮습니다. 실패하면 전문대·기술직 트랙으로 진학합니다 — 단, 학업을 병행해 뒀다면 인서울 4년제로 진학합니다. 의대·로스쿨 도전은 할 수 없습니다.", tag:"확률 도전",
+            est:"스타 약 0.8% · 프로 데뷔 약 7~15% (게임용 단순화)",
+            apply(){ const roll = Math.random(); const starP = 0.008, proP = S.flags.gameScout ? 0.15 : 0.07;
+              if (roll < starP){ S.flags.proGamer = "star"; S.edu = "pro";
+                return { lines:["세계가 주목하는 스타로 데뷔! 21·23·25세 단계에서도 프로 활동으로 수입을 얻고, 26세 단계에서 스타 프로게이머 커리어가 열립니다", "단, 선수 수명은 짧아 30세 전후 스트리머·코치로 전향합니다"], source:"프로게이머 스타 도달 확률은 게임용으로 1% 미만으로 단순화" }; }
+              if (roll < starP + proP){ S.flags.proGamer = "pro"; S.edu = "pro";
+                return { lines:["프로팀 입단 성공 — 21·23·25세 단계에서도 프로 활동으로 수입을 얻고, 26세 단계에서 프로게이머 커리어가 열립니다", "선수 수명은 20대에 집중됩니다"], source:"프로게이머 평균 데뷔·은퇴 연령 참고 (게임용 단순화)" }; }
+              if (S.flags.gameBalance){ S.edu = "seoul4"; const gbLoan = Math.round(tuition(curYear())*4*0.6); S.studentLoan += gbLoan;
+                return { lines:["입단 불발 — 학업을 병행해 둔 덕에 인서울 4년제 일반학과로 진학합니다", `학자금대출 ${fmt(gbLoan)} 발생 (졸업 후 취업 시점부터 연 420만원씩 상환)`], source:"게임용 단순화 — 학업 병행 시 일반 진학 경로 유지 · 등록금은 통계청·교육부 대학등록금 통계 근사" }; }
+              S.edu = "college2";
+              return { lines:["입단 불발 — 전문대·기술직 트랙으로 진학합니다", "게임에 쏟은 시간만큼 학업 트랙은 낮아졌습니다"], source:"게임용 단순화" }; } },
+          ] : []),
+        ]},
+      { age:21, title:"대학 생활, 캠퍼스의 시간 배분", kicker:"21세 · 대학 생활",
+        desc:()=>"대학 생활이 본격화됩니다. 학점, 경험, 돈 — 어디에 시간을 쓰느냐가 첫 직장의 출발선을 바꿉니다.",
+        choices:()=>[
+          { t:"학점 · 스펙 관리", d:"학점과 자격 준비에 집중합니다. 첫 직장 단계에서 대기업 합격·연봉 보너스가 붙습니다.", tag:"스펙",
+            apply(){ S.flags.spec = true;
+              return { lines:["학점·스펙 우위 확보 — 첫 직장 단계에서 보너스"], source:"고용노동부 채용동향조사 — 학점·자격 보유자 우대 경향" }; } },
+          { t:"인턴십 · 실무 경험", d:"방학 인턴과 대외활동으로 실무를 익힙니다. 중견·중소 취업 시 연봉 보너스가 붙습니다.", tag:"경험",
+            apply(){ S.flags.intern = true;
+              return { lines:["실무 경험 확보 — 중견·중소 첫 연봉 +5% 보너스"], source:"고용노동부 — 인턴 경험 보유자 채용 우대 (채용동향조사)" }; } },
+          { t:"아르바이트로 종잣돈", d:"생활비를 스스로 벌며 졸업합니다. 졸업 시점 현금이 두둑해집니다.",
+            apply(){ S.cash += 700;
+              return { lines:["종잣돈 7,000,000원 확보"], source:"통계청 가계금융복지조사 — 20대 가구 금융자산 참고" }; } },
+          { t:"동아리 · 인맥 · 경험", d:"사람과 경험을 쌓습니다. 눈에 보이는 스펙은 없지만 42세 커리어 전환 때 이직 네트워크가 됩니다.", tag:"인맥",
+            apply(){ S.flags.network = true;
+              return { lines:["네트워크 자산 확보 — 42세 커리어 전환 단계에서 이직 보너스"], source:"게임용 단순화 — 인맥의 경력 효과" }; } },
+          ...(S.flags.proGamer ? [
+          { t:"프로팀 주전 경쟁 — 시즌 소화", d:"데뷔한 프로팀에서 시즌을 뛰며 연봉·상금을 법니다. 학점·스펙은 쌓기 어렵지만 커리어 수입이 시작됩니다.", tag:"프로 활동",
+            apply(){ const pay = S.flags.proGamer === "star" ? 4000 : 1500; S.cash += pay;
+              return { lines:[`프로 활동 수입 ${fmt(pay)} 확보 (연봉·상금·방송 수입 합산 근사)`, "23·25세에도 프로 활동 선택지가 이어지고, 26세에 정식 커리어로 연결됩니다"], source:"프로게이머 연봉·상금 분포 참고 (게임용 근사)" }; } },
+          ] : []),
         ]},
       { age:23, title:"대학 후반, 스펙의 갈림길", kicker:"23세 · 취업 준비",
         desc:()=>"졸업이 다가옵니다. 남은 시간과 돈을 어디에 쓰느냐가 첫 직장의 크기를 바꿉니다.",
@@ -1170,44 +1377,139 @@
             apply(){ S.cash += 900;
               return { lines:["종잣돈 9,000,000원 확보", "스펙 보너스는 없지만 출발 현금이 두둑합니다"],
                 source:"통계청 가계금융복지조사 — 20대 가구 평균 금융자산 참고" }; } },
+          ...(S.flags.track==="study" ? [
+          { t:"회계사(CPA) 시험 준비", d:"재학 중 CPA 준비에 들어갑니다. 합격 판정은 26세 첫 직장 단계에서 합니다 (합격 확률 약 30%, 게임용 단순화).", tag:"전문직 트랙",
+            apply(){ S.flags.cpaTrack = true; S.flags.spec = true;
+              return { lines:["CPA 준비 시작 — 26세 단계에서 회계사 도전이 열립니다", "준비 자체가 스펙이 되어 일반 취업에도 보너스가 붙습니다"], source:"금융감독원 공인회계사 시험 구조 참고 (합격 확률은 게임용으로 30%로 단순화)" }; } },
+          ] : []),
+          ...(S.flags.track==="sports" ? [
+          { t:"프로 선수 도전", d:"스포츠 스타가 될 확률은 1~3% 수준으로 낮습니다. 프로 데뷔에 성공해도 선수 수명은 짧고, 실패하면 체육 지도자·트레이너로 진행합니다.", tag:"확률 도전",
+            est: (S.flags.sportsAce ? "스타 약 3% · 프로 데뷔 약 30%" : "스타 약 2% · 프로 데뷔 약 18%") + (S.flags.sportsSteady ? " + 학업 병행 보너스 5%p" : "") + " (게임용 단순화)",
+            apply(){ const roll = Math.random(); const starP = S.flags.sportsAce ? 0.03 : 0.02, proP = (S.flags.sportsAce ? 0.30 : 0.18) + (S.flags.sportsSteady ? 0.05 : 0);
+              if (roll < starP){ S.flags.sportStar = true;
+                return { lines:["전국구 스타로 데뷔! 26세 첫 직장 단계에서 스타 선수 커리어가 열립니다", "단, 선수 수명은 짧아 30대 중반 이후 지도자로 전향합니다"], source:"스포츠 스타 도달 확률은 게임용으로 1~3%로 단순화" }; }
+              if (roll < starP + proP){ S.flags.proAthlete = true;
+                return { lines:["프로 데뷔 성공 — 1군 로스터에 이름을 올렸습니다", "선수 수명은 30대 초중반까지, 이후 지도자·트레이너로 전향합니다"], source:"프로 선수 평균 커리어 기간 참고 (게임용 단순화)" }; }
+              S.flags.sportsCoach = true;
+              return { lines:["프로 데뷔는 불발 — 체육 지도자·트레이너 진로로 진행합니다", "26세 첫 직장 단계에서 체육 관련 직업이 열립니다"], source:"체육 특기생 진로 분포 참고 (게임용 단순화)" }; } },
+          ] : []),
+          ...(S.flags.proGamer ? [
+          { t:"프로 커리어 — 전성기 시즌", d:"20대 초반은 프로게이머의 전성기. 재계약과 대회 상금으로 커리어 수입이 가장 큰 구간입니다.", tag:"프로 활동",
+            apply(){ const pay = S.flags.proGamer === "star" ? 6000 : 2200; S.cash += pay;
+              return { lines:[`프로 활동 수입 ${fmt(pay)} 확보 (연봉·상금 합산 근사)`, "25세에도 프로 활동이 이어지고, 26세 정식 커리어로 연결됩니다"], source:"프로게이머 연봉·상금 분포 참고 (게임용 근사)" }; } },
+          ] : []),
+        ]},
+      { age:25, title:"취업 준비, 어느 문을 두드릴까", kicker:"25세 · 취업 준비",
+        desc:()=>"졸업이 다가옵니다. 1년의 준비 방향이 26세 첫 직장의 선택지와 연봉을 바꿉니다.",
+        choices:()=>[
+          { t:"공기업 · 공공기관 준비", d:"NCS와 전공 시험을 준비합니다. 공기업 취업 시 초임 보너스가 붙습니다.", tag:"안정",
+            apply(){ S.flags.prepPublic = true; S.cash -= 150;
+              return { lines:["준비 비용 1,500,000원 지출", "공기업 첫 직장 선택 시 초임 +5% 보너스"], source:"공공기관 경영정보공개(알리오) — NCS 기반 채용 구조" }; } },
+          { t:"대기업 공채 준비", d:"인적성과 면접을 집중 준비합니다. 대기업 합격 시 초임 보너스가 붙습니다.", tag:"공채",
+            apply(){ S.flags.prepBig = true; S.cash -= 150;
+              return { lines:["준비 비용 1,500,000원 지출", "대기업 첫 직장 선택 시 초임 +4% 보너스"], source:"고용노동부 채용동향조사 — 대기업 공채 구조" }; } },
+          { t:"공무원 시험 준비", d:"학원비 200만원을 쓰고 9급 공무원에 도전합니다. 26세 단계에서 공무원 선택지가 열립니다.", tag:"공무원",
+            apply(){ S.flags.civilTrack = true; S.cash -= 200;
+              return { lines:["준비 비용 2,000,000원 지출", "26세 첫 직장 단계에서 공무원 선택지가 열립니다"], source:"인사혁신처 — 국가공무원 9급 공채 구조" }; } },
+          { t:"바로 취업 · 경력 선행", d:"준비 기간 없이 중소·중견 현장에 먼저 들어갑니다. 실무 경력이 스펙이 됩니다.", tag:"선취업",
+            apply(){ S.flags.intern = true; S.cash += 300;
+              return { lines:["조기 취업으로 현금 3,000,000원 확보, 실무 경력 보너스"], source:"통계청 경제활동인구조사 — 조기 취업자의 경력 선행 효과" }; } },
+          ...(S.flags.proGamer ? [
+          { t:"프로 커리어 — 마지막 전성기 계약", d:"은퇴가 가까워지는 나이. 대형 계약과 상금으로 선수 생활 수입을 마무리합니다.", tag:"프로 활동",
+            apply(){ const pay = S.flags.proGamer === "star" ? 7000 : 2600; S.cash += pay;
+              return { lines:[`프로 활동 수입 ${fmt(pay)} 확보 (연봉·상금 합산 근사)`, "26세 첫 직장 단계에서 프로게이머 커리어가 정식 연봉으로 이어집니다"], source:"프로게이머 연봉·상금 분포 참고 (게임용 근사)" }; } },
+          ] : []),
         ]},
       { age:26, title:"첫 직장", kicker:"26세 · 사회초년생",
         desc:()=>{ const b = Math.round(bigCorpSalary(curYear())); return `${curYear()}년 대기업 대졸 초임은 약 ${b.toLocaleString()}만원. 실업률 ${macro(curYear()).unemp}%의 고용시장에서 어디로 가시겠습니까?`; },
         choices:()=>{
           const base = bigCorpSalary(curYear());
-          return [
+          const pre = []; // 조기 트랙(14세 선택)에서 열린 전문직·선수 경로
+          if (S.flags.medical){
+            pre.push({ t:"의사 — 전공의 수련 시작", d:"의대 졸업 후 전공의 수련 4~5년. 수련 기간 소득은 낮지만, 전문의 이후 평균 사업소득은 2024년 기준 연 4억 200만원 수준입니다.", tag:"전문직",
+              apply(){ S.job="doctor"; S.salary = Math.round(profIncome("doctor", curYear())*0.13);
+                return { lines:[`전공의 수련 시작 — 연봉 ${fmt(S.salary)} (수련 기간 저소득 구간)`, "32세 전문의 취득 시점부터 전문의 소득으로 점프합니다"], source:"국세청 2024년 귀속 종합소득세 — 개인사업자 평균 사업소득 의사 4억 200만원 (연도별 소득 흐름에 맞춰 스케일링, 전공의 기간은 저소득으로 단순화)" }; } });
+            pre.push({ t:"치과의사 — 개원 트랙", d:"치대 트랙으로 개원을 준비합니다. 초반 소득은 낮고, 개원이 안정되는 31세부터 평균 사업소득(2024년 기준 연 2억 2,200만원) 수준으로 오릅니다.", tag:"전문직",
+              apply(){ S.job="dentist"; S.salary = Math.round(profIncome("dentist", curYear())*0.2);
+                return { lines:[`치과의사 진로 시작 — 연봉 ${fmt(S.salary)} (초반 저소득 구간)`, "31세 개원 안정화 시점부터 소득이 점프합니다"], source:"국세청 2024년 귀속 종합소득세 — 개인사업자 평균 사업소득 치과의사 2억 2,200만원 (연도별 스케일링, 게임용 단순화)" }; } });
+          }
+          if (S.flags.lawTrack){
+            pre.push({ t:"로스쿨 도전", d:"입학 확률 약 20% (평균 경쟁률 약 5.6:1), 붙으면 변호사시험 합격 확률 약 50%입니다. 어느 단계에서 실패해도 일반 기업 취업으로 진행합니다.", tag:"전문직 · 확률 도전",
+              est:"입학 약 20% × 변호사시험 약 50% (게임용 단순화)",
+              apply(){ if (Math.random() >= 0.20){ S.job="mid"; S.salary = Math.round(base*0.65);
+                  return { lines:["로스쿨 입학 불발 — 일반 기업 취업으로 진행합니다", `연봉 ${fmt(S.salary)}으로 시작`], source:"법학전문대학원협의회 — 2024 로스쿨 평균 경쟁률 약 5.6:1 (게임용으로 입학 확률 20%로 단순화)" }; }
+                if (Math.random() >= 0.50){ S.job="mid"; S.salary = Math.round(base*0.7);
+                  return { lines:["로스쿨은 졸업했지만 변호사시험에서 고배 — 일반 취업으로 진행합니다", `연봉 ${fmt(S.salary)}으로 시작`], source:"법무부 — 변호사시험 합격률 2024년 53.0%, 2025년 52.28% (게임용으로 50%로 단순화)" }; }
+                S.job="lawyer"; S.salary = Math.round(profIncome("lawyer", curYear()) * 0.30);
+                return { lines:["로스쿨 입학 + 변호사시험 합격 — 변호사로 개업합니다", `초반 연 소득 ${fmt(S.salary)} 수준으로 시작 — 주니어 구간이라 평균보다 낮고, 경력이 쌓이는 32세 무렵 국세청 평균 사업소득 수준으로 오릅니다`], source:"국세청 2024년 귀속 종합소득세 — 개인사업자 평균 사업소득 변호사 1억 600만원 (연도별 스케일링, 주니어 기간은 감액해 단순화)" }; } });
+          }
+          if (S.flags.cpaTrack){
+            pre.push({ t:"회계사 도전", d:"CPA 최종 합격에 도전합니다. 합격 확률 약 30% (게임용 단순화). 실패하면 일반 기업 취업으로 진행합니다.", tag:"전문직 · 확률 도전",
+              apply(){ if (Math.random() < 0.30){ S.job="accountant"; S.salary = Math.round(profIncome("accountant", curYear()) * 0.35);
+                  return { lines:["CPA 합격 — 회계법인에 입사합니다", `주니어 연봉 ${fmt(S.salary)} 수준으로 시작 — 시니어로 올라서는 32세 무렵 평균 수준으로 오릅니다`], source:"회계법인 회계사 평균 연봉 분포 참고 (게임용 근사, 연도별 스케일링, 주니어 기간은 감액해 단순화)" }; }
+                S.job="mid"; S.salary = Math.round(base*0.68);
+                return { lines:["CPA 도전은 불발 — 일반 기업 취업으로 진행합니다", `연봉 ${fmt(S.salary)}으로 시작`], source:"금융감독원 공인회계사 시험 구조 참고 (합격 확률은 게임용으로 30%로 단순화)" }; } });
+          }
+          if (S.flags.civilTrack){
+            pre.push({ t:"공무원 — 9급 행정직", d:"준비해 온 공무원 시험에 합격했습니다. 연봉은 낮지만 정년이 보장되고 연금이 탄탄합니다.", tag:"안정",
+              apply(){ S.job="civil"; S.salary = Math.round(base*0.62); S.saveRate += 0.03;
+                return { lines:[`공무원 임용 — 연봉 ${fmt(S.salary)}`, "고용 안정 + 저축률 +3%p, 위기에도 감봉·해고 없음"], source:"인사혁신처 공무원 보수표·공무원연금 구조 참고 (게임용 근사)" }; } });
+          }
+          if (S.flags.sportStar){
+            pre.push({ t:"프로 스포츠 스타로 활동", d:"단기간 고소득이지만 선수 수명은 짧습니다. 36세에 은퇴해 체육 지도자로 전향합니다.", tag:"스타",
+              apply(){ S.job="sportStar"; S.salary = Math.round(profIncome("sportStar", curYear()));
+                return { lines:[`스타 선수 계약 — 연 소득 ${fmt(S.salary)} 수준`, "36세 전후 은퇴·지도자 전향으로 소득이 조정됩니다"], source:"프로 스포츠 상위 선수 연봉 분포 참고 (게임용 근사, 연도별 스케일링)" }; } });
+          } else if (S.flags.proAthlete){
+            pre.push({ t:"프로 선수로 활동", d:"1군 선수로 뜁니다. 선수 수명은 30대 초중반까지, 이후 트레이너로 전향합니다.", tag:"프로",
+              apply(){ S.job="proAthlete"; S.salary = Math.round(profIncome("proAthlete", curYear()));
+                return { lines:[`프로 선수 계약 — 연 소득 ${fmt(S.salary)} 수준`, "34세 전후 은퇴·트레이너 전향으로 소득이 조정됩니다"], source:"프로 선수 평균 연봉·커리어 기간 참고 (게임용 근사, 연도별 스케일링)" }; } });
+          } else if (S.flags.track === "sports"){
+            pre.push({ t:"체육 지도자 · 트레이너", d:"학교·클럽·피트니스 현장에서 체육을 가르칩니다. 안정적이지만 소득 상한은 낮습니다.", tag:"체육",
+              apply(){ S.job="sportsCoach"; S.salary = Math.round(profIncome("sportsCoach", curYear()));
+                return { lines:[`체육 지도자로 취업 — 연봉 ${fmt(S.salary)} 수준`], source:"체육 지도자·트레이너 평균 소득 참고 (게임용 근사, 연도별 스케일링)" }; } });
+          }
+          if (S.flags.proGamer === "star"){
+            pre.push({ t:"프로게이머 스타로 활동", d:"세계 무대에서 뛰는 스타 선수. 단기간 고소득이지만 선수 수명은 짧아 30세에 스트리머·코치로 전향합니다.", tag:"스타",
+              apply(){ S.job="gamerStar"; S.salary = Math.round(profIncome("gamerStar", curYear()));
+                return { lines:[`스타 프로게이머 계약 — 연 소득 ${fmt(S.salary)} 수준`, "30세 전후 은퇴·전향으로 소득이 조정됩니다"], source:"프로게이머 상위 선수 연봉·상금 분포 참고 (게임용 근사, 연도별 스케일링)" }; } });
+          } else if (S.flags.proGamer === "pro"){
+            pre.push({ t:"프로게이머로 활동", d:"프로팀 소속으로 뜁니다. 선수 수명은 20대에 집중되고, 28세에 일반 취업으로 전향합니다.", tag:"프로",
+              apply(){ S.job="gamerPro"; S.salary = Math.round(profIncome("gamerPro", curYear()));
+                return { lines:[`프로게이머 계약 — 연 소득 ${fmt(S.salary)} 수준`, "28세 전후 은퇴·전향으로 소득이 조정됩니다"], source:"프로게이머 평균 연봉·커리어 기간 참고 (게임용 근사, 연도별 스케일링)" }; } });
+          }
+          return [...pre,
           { t:"대기업 도전", d:`초임 약 ${Math.round(base).toLocaleString()}만원. 가장 높은 연봉과 가장 높은 경쟁률.`,
             est: S.edu==="college2" ? "전문대 트랙: 최종 문턱이 높습니다" : "학력·스펙 조건 충족",
             apply(){ if (S.edu==="college2" && !S.flags.spec){ S.job="mid"; S.salary = Math.round(base*0.72);
                 return { lines:["대기업 최종면접에서 고배 — 중견기업으로 입사", `연봉 ${fmt(S.salary)}으로 시작`], source:"고용노동부 임금직무정보 — 기업규모별 대졸 초임 격차" }; }
-              S.job="big"; S.salary = Math.round(base * (S.flags.spec?1.06:1) * (S.flags.global?1.05:1));
+              S.job="big"; S.salary = Math.round(base * (S.flags.spec?1.06:1) * (S.flags.global?1.05:1) * (S.flags.prepBig?1.04:1));
               return { lines:[`대기업 입사 성공 — 연봉 ${fmt(S.salary)}`, S.earlyStart?"":"선취업 보너스 없음"], source:`고용노동부·통계청 — ${curYear()}년 대기업 대졸 초임 대표값 ${Math.round(base).toLocaleString()}만원` }; } },
           { t:"공기업 · 공공기관", d:`초임 약 ${Math.round(base*0.88).toLocaleString()}만원. 연봉은 조금 낮지만 해고가 없고 연금이 탄탄합니다.`, tag:"안정",
-            apply(){ S.job="public"; S.salary = Math.round(base*0.88); S.saveRate += 0.02;
+            apply(){ S.job="public"; S.salary = Math.round(base*0.88*(S.flags.prepPublic?1.05:1)); S.saveRate += 0.02;
               return { lines:[`공공기관 입사 — 연봉 ${fmt(S.salary)}`, "위기에도 감봉·해고 없음, 저축률 +2%p"], source:"공공기관 경영정보공개(알리오) 초임 평균 근사" }; } },
           { t:"중소 · 중견기업", d:`초임 약 ${Math.round(base*0.65).toLocaleString()}만원. 대신 빠르게 실무를 익히고 이직 카드가 생깁니다.`,
-            apply(){ S.job="mid"; S.salary = Math.round(base*0.65);
+            apply(){ S.job="mid"; S.salary = Math.round(base*0.65*(S.flags.intern?1.05:1));
               return { lines:[`중견기업 입사 — 연봉 ${fmt(S.salary)}`, "44세 이직 이벤트에서 반전 기회가 있습니다"], source:"중소기업 대졸 초임은 대기업의 약 60–65% (고용노동부)" }; } },
           { t:"스타트업 합류", d:`초임 약 ${Math.round(base*0.78).toLocaleString()}만원 + 스톡옵션. 대박 아니면 쪽박의 트랙.`, tag:"고위험",
             apply(){ S.job="startup"; S.salary = Math.round(base*0.78); S.flags.stockOption = true;
               return { lines:[`스타트업 입사 — 연봉 ${fmt(S.salary)}`, "스톡옵션 보유: 44세 커리어 이벤트에서 결판"], source:"스타트업 초임·지분 보상 구조 (중소벤처기업부 창업실태조사 참고)" }; } },
         ];}},
       { age:29, title:"첫 재테크", kicker:"29세 · 자산 배분",
-        desc:()=>`3년간 모은 돈 ${fmt(S.cash)}과 앞으로의 저축을 어디에 둘까요? 이 선택은 ${curYear()}년부터 다음 5년의 KOSPI 실제 흐름을 그대로 탑니다.`,
+        desc:()=>`3년간 모은 돈 ${fmt(S.cash)}과 앞으로의 저축을 어디에 둘까요? 이 선택은 ${curYear()}년부터 다음 5년의 실제 시장 흐름을 그대로 탑니다.`,
         choices:()=>[
           { t:"예·적금 중심", d:"원금 보장. 대신 물가상승률을 이기기 어렵습니다.", tag:"안정",
             apply(){ S.allocInv = 0; S.speculative=false;
               return { lines:["저축 전액 예금으로 — 이자는 기준금리를 따라갑니다", `현재 기준금리 ${macro(curYear()).rate}%`],
                 source:"한국은행 ECOS — 예금금리 ≈ 기준금리 −0.8%p로 계산" }; } },
-          { t:"인덱스 ETF 적립", d:"저축의 70%를 코스피 인덱스에, 종잣돈 절반을 옮깁니다. 시장 수익률을 그대로 받습니다.", tag:"시장수익",
-            apply(){ const mv = Math.round(S.cash*0.5); S.cash -= mv; S.invest += mv; S.allocInv = 0.7; S.speculative=false;
-              return { lines:[`${fmt(mv)}을 인덱스로 이동, 이후 저축의 70% 적립`, "수익은 실제 KOSPI 연말지수 변화로 정산됩니다"],
-                source:"KRX KOSPI 연말지수 (게임 내 정산에 직접 사용)" }; } },
-          { t: curYear()>=2016 ? "테마주 · 코인 공격 투자" : "성장주 · 테마주 공격 투자",
-            d:"저축의 80%를 고변동 자산에. 지수가 오르면 1.7배로 벌고, 내리면 1.7배로 잃습니다.", tag:"고변동",
-            apply(){ const mv = Math.round(S.cash*0.6); S.cash -= mv; S.invest += mv; S.allocInv = 0.8; S.speculative = true;
-              return { lines:[`${fmt(mv)} 이동, 변동성 1.7배 적용`, "2008년·2022년 같은 하락장에서 크게 흔들립니다"],
-                source:"KRX·업비트 지수 변동성 참고 — 개별 테마 자산의 지수 대비 초과 변동으로 근사" }; } },
+          { t:"ETF 투자", d:"저축의 70%를 ETF에, 종잣돈 절반을 옮깁니다. 다음 화면에서 나스닥·코스닥·채권·금 중 하나를 한 번 더 고릅니다.", tag:"시장수익", sub:"etf",
+            apply(pid){ const mv = Math.round(S.cash*0.5); S.cash -= mv; S.invest += mv; S.allocInv = 0.7; S.speculative=false; S.invProduct = pid || null;
+              return { lines:[`${fmt(mv)}을 ${productLabel(S.invProduct)}로 이동, 이후 저축의 70% 적립`, "수익률은 선택한 상품의 연도별 실제 수익률로 정산되고, 다음 단계 정산 로그에 상품·연도별로 표시됩니다"],
+                source: PRODUCTS[S.invProduct].src + " — 연도별 실제 수익률을 게임 내 정산에 직접 사용" }; } },
+          { t:"고위험 투자",
+            d:"저축의 80%를 고변동 자산에. 다음 화면에서 비트코인·테마주·알트코인 중 하나를 한 번 더 고릅니다.", tag:"고변동", sub:"high",
+            apply(pid){ const mv = Math.round(S.cash*0.6); S.cash -= mv; S.invest += mv; S.allocInv = 0.8; S.invProduct = pid || "theme"; S.speculative = S.invProduct === "theme";
+              return { lines:[`${fmt(mv)}을 ${productLabel(S.invProduct)}로 이동, 이후 저축의 80% 투입`, "변동성이 큰 자산이라 다음 단계 정산 로그에 상품 수익률과 평가액이 따로 표시됩니다", "2008년·2022년 같은 하락장에서 크게 흔들립니다"],
+                source: PRODUCTS[S.invProduct].src }; } },
         ]},
       { age:31, title:"결혼, 할 것인가", kicker:"31세 · 가구 형성",
         desc:()=>"결혼은 재무 이벤트이기도 합니다. 맞벌이 가구의 저축 여력과 청약 부양가족 가점이 달라집니다.",
@@ -1225,13 +1527,75 @@
               return { lines:["저축률 +5%p (1인 가구 고정비 절감)", "청약 가점은 무주택기간·통장만으로 쌓아야 합니다"],
                 source:"통계청 인구총조사 — 1인 가구 비중 2023년 35.5%" }; } },
         ]},
+      { age:33, title:"첫아이, 육아의 시작", kicker:"33세 · 육아",
+        desc:()=> S.kids > 0 ? "첫아이가 태어났습니다. 돌봄 방식을 정하는 일이 곧 가계 구조를 정하는 일이 됩니다." : "아이는 없지만, 가족과 커리어의 무게중심이 옮겨가는 시기입니다.",
+        choices:()=> S.kids > 0 ? [
+          { t:"맞벌이 유지 + 돌봄 서비스", d:"연 600만원의 돌봄 비용을 38세까지 냅니다. 커리어와 소득은 유지됩니다.", tag:"맞벌이",
+            apply(){ S.childCostUntil = 38;
+              return { lines:["38세까지 연 6,000,000원 돌봄 비용 발생 (정산에 반영)", "맞벌이 소득 구조는 유지됩니다"], source:"육아정책연구소·통계청 — 영유아 돌봄·보육 비용 대표값 근사" }; } },
+          { t:"1년 육아휴직", d:"34세 1년간 저축 여력이 크게 줄어듭니다. 대신 아이와의 시간과 이후 커리어 복귀를 지킵니다.", tag:"휴직",
+            apply(){ S.flags.careLeave = true;
+              return { lines:["육아휴직 1년 — 34세 구간의 저축 여력이 40% 수준으로 줄어듭니다 (정산에 반영)", "복직 후 커리어는 유지됩니다"], source:"고용보험 육아휴직급여 제도 — 통상임금의 80% 수준(상한 존재)을 게임용으로 단순화" }; } },
+          { t:"조부모 도움 + 감사 지원", d:"가족의 도움을 받아 돌봄 비용을 줄입니다. 지원·감사로 현금 200만원을 씁니다.", tag:"가족",
+            apply(){ S.cash -= 200;
+              return { lines:["현금 2,000,000원 지출, 돌봄 비용은 들지 않습니다", "가족 네트워크가 자산이 되는 선택입니다"], source:"통계청 가계금융복지조사 — 가구 간 이전지출 항목 참고" }; } },
+        ] : [
+          { t:"부모님 건강 챙기기", d:"현금 300만원으로 부모님 건강검진과 생활 지원을 시작합니다.",
+            apply(){ S.cash -= 300;
+              return { lines:["현금 3,000,000원 지출 — 부모님 건강 지원"], source:"통계청 가계금융복지조사 — 이전지출 항목 참고" }; } },
+          { t:"커리어 투자 — 자격·네트워크", d:"현금 400만원을 씁니다. 42세 커리어 전환 때 이직 보너스가 붙습니다.", tag:"투자",
+            apply(){ S.cash -= 400; S.flags.jumpReady = true;
+              return { lines:["현금 4,000,000원 지출", "42세 커리어 전환·44세 이직에서 보너스가 붙습니다"], source:"게임용 단순화 — 경력 투자의 이직 효과" }; } },
+          { t:"저축 가속", d:"지출을 줄여 저축률을 3%p 올립니다. 집 마련이 빨라집니다.", tag:"저축",
+            apply(){ S.saveRate += 0.03;
+              return { lines:["저축률 +3%p"], source:"게임용 단순화" }; } },
+        ]},
       { age:34, type:"housing", round:1 },
+      { age:36, title:"자녀 교육, 어디까지 쓸 것인가", kicker:"36세 · 자녀 교육",
+        desc:()=> S.kids > 0 ? "아이가 초등학교에 들어갑니다. 사교육에 얼마나 쓸지가 앞으로 10년의 저축 속도를 정합니다." : "자녀 교육비 대신 다른 곳에 무게를 둘 수 있는 시기입니다.",
+        choices:()=> S.kids > 0 ? [
+          { t:"교육에 집중", d:"44세까지 연 900만원을 사교육에 씁니다. 저축이 그만큼 줄어듭니다.", tag:"교육",
+            apply(){ S.eduSpendUntil = 44;
+              return { lines:["44세까지 연 9,000,000원 교육 지출 (정산에 반영)"], source:"통계청 사교육비조사 — 초·중학생 1인당 월평균 사교육비 흐름 근사" }; } },
+          { t:"교육과 저축 균형", d:"40세까지만 연 900만원 수준으로 쓰고, 이후에는 저축으로 돌립니다.", tag:"균형",
+            apply(){ S.eduSpendUntil = 40;
+              return { lines:["40세까지 연 9,000,000원 교육 지출 (정산에 반영)", "이후 저축 속도가 회복됩니다"], source:"통계청 사교육비조사 참고" }; } },
+          { t:"저축 우선 · 공교육 중심", d:"사교육을 최소화하고 저축률을 2%p 올립니다.", tag:"저축",
+            apply(){ S.saveRate += 0.02;
+              return { lines:["저축률 +2%p", "교육비는 공교육 중심으로 유지합니다"], source:"통계청 사교육비조사 — 사교육 미참여 가구 비중 참고" }; } },
+        ] : [
+          { t:"부모 부양 시작", d:"42세까지 연 600만원의 부양 비용을 감당합니다.", tag:"가족",
+            apply(){ S.childCostUntil = 42;
+              return { lines:["42세까지 연 6,000,000원 부양 지출 (정산에 반영)"], source:"통계청 가계금융복지조사 — 이전지출 항목 참고" }; } },
+          { t:"노후 저축 집중", d:"교육비가 없는 만큼 저축률을 3%p 올립니다.", tag:"저축",
+            apply(){ S.saveRate += 0.03;
+              return { lines:["저축률 +3%p"], source:"게임용 단순화" }; } },
+          { t:"부업 · 자기계발", d:"초기 비용 200만원을 쓰고 45세까지 연 250만원의 부업 소득을 만듭니다.", tag:"부업",
+            apply(){ S.cash -= 200; S.sideIncome = 250; S.sideIncomeUntil = 45;
+              return { lines:["현금 2,000,000원 지출", "45세까지 연 2,500,000원 부업 소득 (정산에 반영)"], source:"통계청 — 부업 종사 가구 소득 항목 참고 (게임용 근사)" }; } },
+        ]},
       { age:39, type:"housing", round:2 },
+      { age:42, title:"커리어 전환, 한 번 더 갈아탈까", kicker:"42세 · 커리어 전환",
+        desc:()=>`연봉 ${fmt(S.salary)}의 40대 초반. 남은 커리어는 약 18년 — 지금의 준비가 44세 점프의 크기를 정합니다.`,
+        choices:()=>[
+          { t:"이직 준비 — 시장가치 점검", d:"네트워크와 포트폴리오를 정비합니다. 44세 이직 선택 시 연봉 상승폭이 커집니다.", tag:"이직",
+            apply(){ S.flags.jumpReady = true;
+              return { lines:["이직 준비 완료 — 44세 이직 시 연봉 상승폭 +5%p 보너스"], source:"게임용 단순화 — 사전 준비의 이직 효과" }; } },
+          { t:"대학원 · 자격증으로 전문성", d:"현금 1,200만원을 씁니다. 전문성이 붙어 연봉이 즉시 8% 오릅니다.", tag:"전문성",
+            apply(){ S.cash -= 1200; const before = S.salary; S.salary = Math.round(S.salary*1.08);
+              return { lines:["현금 12,000,000원 지출", `연봉 ${fmt(before)} → ${fmt(S.salary)}`], source:"고용노동부 — 학위·자격 보유자의 임금 프리미엄 참고" }; } },
+          { t:"부업 시작", d:"초기 비용 100만원을 쓰고 52세까지 연 300만원의 부업 소득을 만듭니다.", tag:"부업",
+            apply(){ S.cash -= 100; S.sideIncome = 300; S.sideIncomeUntil = 52;
+              return { lines:["현금 1,000,000원 지출", "52세까지 연 3,000,000원 부업 소득 (정산에 반영)"], source:"통계청 — 부업 종사 가구 소득 항목 참고 (게임용 근사)" }; } },
+          { t:"현직 집중", d:"아무것도 바꾸지 않고 저축률을 2%p 올립니다.", tag:"안정",
+            apply(){ S.saveRate += 0.02;
+              return { lines:["저축률 +2%p"], source:"게임용 단순화" }; } },
+        ]},
       { age:44, title:"커리어의 점프", kicker:"44세 · 중년의 갈림길",
         desc:()=>`연봉 ${fmt(S.salary)}의 중년. ${curYear()}년 실업률 ${macro(curYear()).unemp}%의 시장에서 승부를 걸까요?`,
         choices:()=>[
           { t:"이직으로 점프", d:"연봉 +22%. 중견 출신이라면 대기업으로의 반전도 가능합니다.", 
-            apply(){ const before = S.salary; S.salary = Math.round(S.salary * (S.job==="mid" ? 1.3 : 1.22));
+            apply(){ const before = S.salary; S.salary = Math.round(S.salary * (S.job==="mid" ? 1.3 : 1.22) * ((S.flags.jumpReady || S.flags.network) ? 1.05 : 1));
               return { lines:[`연봉 ${fmt(before)} → ${fmt(S.salary)}`, "남은 16년의 소득 궤적이 통째로 올라갑니다"],
                 source:"고용노동부 — 40대 이직자 임금상승률 평균 참고" }; } },
           { t:"현직에서 승진 트랙", d:"연봉 +12%. 안전하게 임원·부장 트랙을 밟습니다.", tag:"안정",
@@ -1247,6 +1611,21 @@
             apply(){ const gain = 6000 + Math.round(Math.random()*9000); S.cash += gain; S.flags.stockOption = false;
               return { lines:[`스톡옵션 차익 ${fmt(gain)} 확보`, "내 집 마련 2막의 실탄이 됩니다"], source:"스타트업 지분 보상 사례 기반 근사 (상장·M&A 시 행사 가정)" }; } }] : []),
         ]},
+      { age:47, title:"노후 준비, 연금과 건강", kicker:"47세 · 노후 준비",
+        desc:()=>"은퇴가 13년 앞으로 다가왔습니다. 연금과 건강, 부모 부양 사이에서 무게를 정합니다.",
+        choices:()=>[
+          { t:"연금저축 · IRP 시작", d:"현금의 20%를 연금계좌로 옮겨 세액공제와 과세이연 효과를 챙깁니다.", tag:"절세",
+            apply(){ const mv = Math.round(S.cash*0.2); S.cash -= mv; S.pensionBoost = (S.pensionBoost||0) + Math.round(mv*1.12);
+              return { lines:[`${fmt(mv)}을 연금계좌로 이전, 세액공제·과세이연 효과 +12% 반영`, "은퇴 정산의 연금 자산으로 합산됩니다"], source:"국세청 — 연금계좌 세액공제율 13.2–16.5%, 과세이연 효과" }; } },
+          { t:"건강 투자 — 검진 · 운동", d:"현금 400만원을 건강에 씁니다. 은퇴 후 의료비 부담을 줄이는 투자입니다.", tag:"건강",
+            apply(){ S.cash -= 400; S.flags.healthy = true;
+              return { lines:["현금 4,000,000원 지출 — 건강검진·운동 루틴 정착", "숫자로 바로 남지 않지만 은퇴 후 삶의 질을 지킵니다"], source:"국민건강보험공단 — 연령대별 의료비 지출 흐름 참고" }; } },
+          { t:"부모 부양 본격화", d:"52세까지 연 600만원의 부양 비용을 감당합니다.", tag:"가족",
+            apply(){ S.childCostUntil = 52;
+              return { lines:["52세까지 연 6,000,000원 부양 지출 (정산에 반영)"], source:"통계청 가계금융복지조사 — 이전지출 항목 참고" }; } },
+          { t:"현상 유지", d:"아무것도 바꾸지 않습니다.",
+            apply(){ return { lines:["포트폴리오 유지"], source:"—" }; } },
+        ]},
       { age:49, title:"돈이 새는 곳, 노후냐 교육이냐", kicker:"49세 · 자산 재배분",
         desc:()=>"자녀 교육비와 부모 부양, 노후 준비가 동시에 몰리는 나이. 무엇에 무게를 두시겠습니까?",
         choices:()=>[
@@ -1254,9 +1633,9 @@
             apply(){ S.eduSpendUntil = 55;
               return { lines:["55세까지 연 9,000,000원 교육 지출", "대신 노후 자산 형성 속도는 느려집니다"],
                 source:"통계청 사교육비조사 — 고교생 1인당 월평균 사교육비 약 60만원(2024)" }; } }] : []),
-          { t:"노후 투자 확대", d:"저축의 85%를 인덱스 투자로 돌립니다. 은퇴까지 11년, 복리의 마지막 구간입니다.", tag:"공격 전환",
-            apply(){ S.allocInv = 0.85;
-              return { lines:["투자 비중 85%로 상향", "수익은 남은 기간 KOSPI 흐름을 탑니다"], source:"KRX KOSPI 장기 수익률 참고" }; } },
+          { t:"노후 투자 확대", d:"저축의 85%를 ETF 투자로 돌립니다. 다음 화면에서 나스닥·코스닥·채권·금 중 하나를 한 번 더 고릅니다. 은퇴까지 11년, 복리의 마지막 구간입니다.", tag:"공격 전환", sub:"etf",
+            apply(pid){ S.allocInv = 0.85; if (pid) S.invProduct = pid; S.speculative = false;
+              return { lines:["투자 비중 85%로 상향", `수익은 남은 기간 ${productLabel(S.invProduct)}의 연도별 실제 수익률을 탑니다`, "다음 단계 정산 로그에 상품·연도별로 표시됩니다"], source: PRODUCTS[S.invProduct].src + " — 연도별 실제 수익률을 게임 내 정산에 직접 사용" }; } },
           { t:"경기 소형 아파트 갭투자", d:"여유자금으로 일산 소형 아파트를 전세를 끼고 삽니다. 두 번째 부동산 자산.", tag:"부동산",
             apply(){ const price = Math.round(aptPriceAt(aptById("ilsan-gangseon"), curYear())*0.8);
               const jeonseCover = Math.round(price*0.62); const need = price - jeonseCover;
@@ -1269,6 +1648,20 @@
           { t:"부모 부양 · 가족에 집중", d:"연 500만원의 부양 비용을 감당합니다. 자산은 줄지만 후회는 없습니다.",
             apply(){ S.eduSpendUntil = 55; S.flags.familyFirst = true;
               return { lines:["55세까지 연 5,000,000원 수준의 부양 지출 (정산에 반영)", "숫자로 남지 않는 선택입니다"], source:"통계청 가계금융복지조사 — 이전지출 항목 참고" }; } },
+        ]},
+      { age:52, title:"은퇴 준비, 마지막 정리", kicker:"52세 · 은퇴 준비",
+        desc:()=>"은퇴까지 8년. 연금 수령 구조와 은퇴 후 소득을 미리 정리합니다.",
+        choices:()=>[
+          { t:"연금 수령 전략 확정", d:"현금의 30%를 연금계좌로 옮겨 수령 구조를 확정합니다. 과세이연 효과 +10%를 반영합니다.", tag:"연금",
+            apply(){ const mv = Math.round(S.cash*0.3); S.cash -= mv; S.pensionBoost = (S.pensionBoost||0) + Math.round(mv*1.10);
+              return { lines:[`${fmt(mv)}을 연금계좌로 이전, 과세이연 효과 +10% 반영`, "은퇴 정산의 연금 자산으로 합산됩니다"], source:"국세청 — 연금계좌 과세이연·연금소득세 구조 참고" }; } },
+          { t:"은퇴 후 파트타임 준비", d:"자격과 네트워크를 정비해, 은퇴 전까지 연 350만원의 파트타임·부업 소득을 만듭니다.", tag:"소득",
+            apply(){ S.sideIncome = 350; S.sideIncomeUntil = 60;
+              return { lines:["60세까지 연 3,500,000원 부업·파트타임 소득 (정산에 반영)"], source:"통계청 경제활동인구조사 — 50대 부업·시간제 종사 흐름 참고 (게임용 근사)" }; } },
+          { t:"주거 정리 검토", d:"지금 집과 전세 구조를 점검합니다. 실제 매도·갈아타기는 아래 '집 사고팔기'에서 바로 할 수 있습니다.", tag:"주거",
+            apply(){ return { lines:[S.house ? `보유 주택 시가 ${fmt(houseValue())} — 정리는 지도 거래로 진행하세요` : "무주택 상태 — 은퇴 전 주거 안정이 과제입니다"], source:"—" }; } },
+          { t:"현상 유지", d:"아무것도 바꾸지 않습니다.",
+            apply(){ return { lines:["포트폴리오 유지"], source:"—" }; } },
         ]},
       { age:55, title:"은퇴 설계, 마지막 카드", kicker:"55세 · 은퇴 준비",
         desc:()=>"은퇴까지 5년. 집과 연금을 어떻게 정리하느냐가 최종 자산의 모양을 정합니다.",
@@ -1291,6 +1684,58 @@
         ]},
     ];
 
+    /* ---------- 투자 세부 상품 선택 (ETF 4종 · 고위험 3종) ----------
+       ETF·고위험 선택지를 고르면 이 화면에서 상품을 한 번 더 고른다.
+       재테크(29세)·자산 재배분(49세) 등 sub가 붙은 모든 선택지가 이 화면을 공유한다 */
+    const ETF_SUB = [
+      { id:"nasdaq", d:"미국 나스닥 종합지수를 따라갑니다. 성장성이 크지만 미국 증시 등락에 그대로 노출됩니다." },
+      { id:"kosdaq", d:"국내 코스닥 지수를 따라갑니다. 중소·성장주 비중이 커 코스피보다 등락이 큽니다." },
+      { id:"bond", d:"국고채 중심 채권에 투자합니다. 등락이 작고, 금리가 내리는 해에 플러스가 나는 안정형입니다." },
+      { id:"gold", d:"국제 금 시세를 따라갑니다. 위기 국면에서 오르는 안전자산 성격이 강합니다." }
+    ];
+    const HIGH_SUB = [
+      { id:"bitcoin", d:"대표 암호화폐. 연 단위로 수 배 오르기도, 절반 이하로 떨어지기도 합니다.", from:2013 },
+      { id:"theme", d:"유행 테마에 올라탄 개별 주식. 지수가 오르면 1.7배로 벌고, 내리면 1.7배로 잃습니다." },
+      { id:"altcoin", d:"비트코인보다 변동성이 큰 알트코인 묶음. 상승·하락 폭 모두 비트코인보다 크게 반영됩니다.", from:2013, fromNote:"알트코인이 등장한" }
+    ];
+    function renderSubChoice(st, c, snap){
+      const year = curYear();
+      const isEtf = c.sub === "etf";
+      const list = isEtf ? ETF_SUB : HIGH_SUB;
+      app.innerHTML = `<div class="card fade">
+        <div class="kicker">${st.kicker} · 세부 선택</div>
+        <h2>${isEtf ? "어떤 ETF에 투자할까요?" : "어떤 고위험 자산에 투자할까요?"}</h2>
+        <p class="muted" style="text-wrap:pretty">${isEtf
+          ? "상품마다 따라가는 지수·자산이 달라 같은 해에도 수익률이 완전히 다르게 나옵니다. 수익률은 각 연도의 실제 지수·시세로 정산됩니다."
+          : "세 자산 모두 변동성이 큽니다. 결과는 다음 단계 정산 때 상품의 수익률과 투자금 → 평가액으로 한 줄씩 표시됩니다."}</p>
+        <div class="choices">${list.map(p=>{
+          const locked = p.from && year < p.from;
+          const prev = !locked ? productFactor(p.id, year-1) : null;
+          return `<button class="choice" data-p="${p.id}" type="button" ${locked ? "disabled style=\"opacity:.55;cursor:not-allowed\"" : ""}>
+            <span class="t">${productLabel(p.id)} ${locked ? `<span class="tag gold">아직 없음</span>` : ""}</span>
+            <span class="d">${locked ? `${p.fromNote || "비트코인 거래가 본격화한"} ${p.from}년부터 선택할 수 있습니다. 지금은 ${year}년이라 아직 없습니다.` : p.d}</span>
+            ${prev ? `<span class="est">참고 · 직전 연도(${year-1}년) 수익률 ${fmtRatePct(prev.ratePct)}${prev.assumed ? " (가정)" : ""}</span>` : ""}
+          </button>`; }).join("")}
+        </div>
+        <p class="tiny muted" style="margin-top:12px">수익률 출처는 상품마다 다릅니다 — 선택을 확정하면 결과 화면에 그 상품의 출처가 표시되고, 이후 정산 로그에도 해마다 함께 표시됩니다. 2025년 이후 구간은 실제 통계가 없어 가정 수익률로 정산합니다.</p>
+        <div class="btn-row">
+          <button class="btn ghost" id="btnSubBack" type="button">← 이전으로 · 다른 선택지 보기</button>
+        </div>
+      </div>`;
+      scrollTop();
+      document.getElementById("btnSubBack").onclick = ()=> renderStage();
+      app.querySelectorAll(".choice[data-p]").forEach(btn=>{
+        btn.onclick = ()=>{
+          const pid = btn.dataset.p;
+          const before = netWorth();
+          const res = c.apply(pid);
+          const dispC = Object.assign({}, c, { t: c.t + " · " + productLabel(pid) });
+          S.history.push({ age:S.age, title:st.title, choice:dispC.t });
+          renderResult(st, dispC, res, before, snap);
+        };
+      });
+    }
+
     function renderStage(){
       const st = STAGES[S.stageIdx];
       if (!st){ renderFinal(); return; }
@@ -1298,7 +1743,6 @@
       const year = curYear();
       const shock = shockBanner(S.lastYear, year);
       const settle = S.settleLog.length ? `<div class="log"><ul>${S.settleLog.map(l=>`<li class="${l.cls}"><span class="dot"></span><span class="log-main"><span>${l.text}</span>${l.stat?`<span class="statline">${l.stat}</span>`:""}</span></li>`).join("")}</ul></div>` : "";
-      S.settleLog = [];
       app.innerHTML = `<div class="card fade">
         <div class="kicker">${st.kicker} · ${year}년</div>
         <h2>${st.title}</h2>
@@ -1312,12 +1756,21 @@
             <span class="d">${c.d}</span>
             ${c.est?`<span class="est">${c.est}</span>`:""}
           </button>`).join("")}
+        </div>
+        <div class="extra-trade">
+          <div class="extra-trade-head"><span class="t">집 사고팔기 (지도)</span><span class="tag teal">추가 행동</span></div>
+          <p class="small muted" style="margin-top:4px">${S.house
+            ? `현재 ${aptById(S.house.aptId).name} 보유 중 · 시가 ${fmt(houseValue())}${S.loan > 0 ? ` · 주담대 잔액 ${fmt(S.loan)}` : ""}. 지금 팔거나, 팔고 다른 단지로 갈아탈 수 있습니다.`
+            : `아직 집이 없습니다. ${year}년 시세와 ${year}년 대출 규제로, 지도에서 단지를 골라 살 수 있습니다.`}
+          거래는 이 단계의 선택과 별개로 진행됩니다 — 거래를 마쳐도 이 화면으로 돌아와 원래 선택을 이어서 고를 수 있습니다.</p>
+          <button class="btn ghost" id="btnExtraTrade" type="button" style="width:100%;margin-top:12px">${S.house ? "매도 · 갈아타기 하러 가기" : "지도에서 단지 고르러 가기"}</button>
         </div></div>`;
       scrollTop();
       app.querySelectorAll(".choice").forEach(btn=>{
         btn.onclick = ()=>{
           const snap = snapshotState(); // 선택 적용 전 상태 — 결과 화면에서 되돌릴 때 복원
           const c = st.choices()[parseInt(btn.dataset.i,10)];
+          if (c.sub){ renderSubChoice(st, c, snap); return; } // ETF·고위험은 세부 상품을 한 번 더 고른다
           const before = netWorth();
           const res = c.apply();
           if (st.age === 26 && S.earlyStart && !S.flags.earlyPaid){
@@ -1328,6 +1781,8 @@
           renderResult(st, c, res, before, snap);
         };
       });
+      const extraBtn = document.getElementById("btnExtraTrade");
+      if (extraBtn) extraBtn.onclick = ()=>{ extraTradeSnap = snapshotState(); renderExtraTradeIntro(st); };
     }
 
     function renderResult(st, c, res, before, snap){
@@ -1443,8 +1898,7 @@
       const year = curYear();
       const shock = shockBanner(S.lastYear, year);
       const settle = S.settleLog.length ? `<div class="log"><ul>${S.settleLog.map(l=>`<li class="${l.cls}"><span class="dot"></span><span class="log-main"><span>${l.text}</span>${l.stat?`<span class="statline">${l.stat}</span>`:""}</span></li>`).join("")}</ul></div>` : "";
-      S.settleLog = [];
-      const own = st.round === 2 && S.house;
+      const own = !!S.house; // 상시 거래로 34세 전에 집을 산 경우도 유주택자로 취급한다 (round가 아니라 실제 보유 여부가 기준)
       app.innerHTML = `<div class="card fade">
         <div class="kicker">${st.round===1 ? "34세 · 생애 최대의 선택" : "39세 · 주거 2막"} · ${year}년</div>
         <h2>${own ? "갈아탈 것인가, 머물 것인가" : "내 집 마련의 시간"}</h2>
@@ -1480,12 +1934,15 @@
     function doJeonse(){
       const mult = S.region.includes("서울") ? 1.0 : S.region.includes("인천") ? 0.62 : 0.78;
       const dep = Math.round(15000 * Math.pow(1.04, curYear()-2015) * mult);
-      if (S.jeonse > 0){ S.cash += S.jeonse - 0; }
+      if (S.jeonse > 0){ S.cash += S.jeonse; }
       if (S.jeonseLoan > 0){ S.cash -= S.jeonseLoan; S.jeonseLoan = 0; }
       S.jeonse = dep;
-      const funds = S.cash;
-      if (funds >= dep){ S.cash -= dep; }
-      else { const loanAmt = Math.round((dep - Math.max(funds,0)) ); S.cash = 0; S.jeonseLoan = loanAmt; }
+      // 보증금은 현금 → 투자 순서로 낸다(투자자산도 가용 자금). 현금이 마이너스(마이너스통장 빚)여도 0으로 지우지 않고
+      // 그대로 둬 빚이 소멸하지 않게 하며, 현금·투자로도 모자라는 만큼만 전세대출로 메운다
+      let pay = dep;
+      const fromCash = Math.min(Math.max(S.cash, 0), pay); S.cash -= fromCash; pay -= fromCash;
+      if (pay > 0){ const fromInv = Math.min(Math.max(S.invest, 0), pay); S.invest -= fromInv; pay -= fromInv; }
+      if (pay > 0) S.jeonseLoan = pay;
     }
     function housingResult(st, res, before){
       const delta = netWorth() - before;
@@ -1513,6 +1970,72 @@
         };
       }
       document.getElementById("btnNext").onclick = ()=>{ housingSnap = null; advance(); };
+    }
+
+    /* ================= 추가 행동: 어느 단계에서든 집 사고팔기 =================
+       34·39세 주거 단계와 별개로, 모든 생애 단계 화면에서 여는 거래 화면이다.
+       거래는 그 단계의 선택을 소비하지 않는다: 확정하면 같은 단계 화면으로 돌아가
+       원래 선택지를 그대로 고를 수 있고, 거래 전 스냅샷(extraTradeSnap)으로 되돌려 취소도 가능하다.
+       시세·대출 한도는 전부 거래가 일어나는 해의 값(aptPriceAt·mortgageLimits)을 그대로 쓴다 */
+    let extraTradeSnap = null; // 거래 진입 직전 스냅샷 — 결과 미리보기에서 거래를 취소할 때 복원
+    function renderExtraTradeIntro(st){
+      const year = curYear();
+      const own = !!S.house;
+      app.innerHTML = `<div class="card fade">
+        <div class="kicker">${S.age}세 · 추가 행동 · ${year}년</div>
+        <h2>집 사고팔기 (지도)</h2>
+        ${macroStrip(year)}
+        <p style="margin-top:16px">${own
+          ? `현재 ${aptById(S.house.aptId).name} 보유 중, 시가 ${fmt(houseValue())}${S.loan > 0 ? `, <span class="loan-badge">대출 있음</span> 주담대 잔액 ${fmt(S.loan)} · 연 상환 ${fmt(S.loanPay)} · 남은 만기 ${S.loanYearsLeft}년` : ", 남은 대출 없음"}. 팔 때는 매도 대금에서 대출 잔액부터 갚습니다. 새 집을 살 때는 ${year}년의 시세와 대출 규제가 그대로 적용됩니다.`
+          : `아직 집이 없습니다. 가진 돈은 현금·투자 합쳐 ${fmt(ownFunds())}${S.jeonse > 0 ? `, 전세보증금 ${fmt(S.jeonse)}` : ""}. ${year}년의 시세와 대출 규제로 지도에서 단지를 골라 살 수 있습니다.`}</p>
+        <p class="small muted">이 거래는 올해의 생애 선택과 별개입니다. 거래를 마쳐도 이 단계의 선택 화면으로 돌아가 원래 선택을 이어서 고를 수 있습니다.</p>
+        <div class="choices" id="xChoices"></div>
+        <div class="btn-row"><button class="btn ghost" id="btnExtraBack" type="button">← 거래 없이 이 단계로 돌아가기</button></div>
+      </div>`;
+      scrollTop(); updateHUD();
+      const box = document.getElementById("xChoices");
+      const opts = [];
+      if (own){
+        opts.push({ t:"매도하기", d:"지금 집을 팔고 차액을 현금으로 확보합니다. 대출이 있으면 잔액부터 상환합니다.", fn:()=>{
+          extraTradeSnap = snapshotState();
+          const before = netWorth();
+          const nm = aptById(S.house.aptId).name, hv = houseValue(), repaid = sellHouse();
+          renderExtraTradeResult(st, { lines:[`${nm}을 ${fmt(hv)}에 매도했습니다`, ...(repaid > 0 ? [`매도 대금에서 주담대 잔액 ${fmt(repaid)}을 먼저 상환했습니다`] : []), "지금은 무주택 상태입니다. 이 단계의 선택 화면으로 돌아가 원래 선택을 이어서 고를 수 있습니다"], source:"국토교통부 실거래가 공개시스템 — 보유 단지 시세는 게임 내 단지별 가격 흐름으로 계산" }, before);
+        } });
+        opts.push({ t:"갈아타기 — 매도 후 지도에서 고르기", d:`${year}년 시세로 더 나은 입지의 단지를 고릅니다. 새 집에도 ${year}년 대출 규제가 적용됩니다.`, tag:"지도", fn:()=>{ extraTradeSnap = snapshotState(); sellHouse(); updateHUD(); renderMapBuy(st, "집 사고팔기 · 갈아타기", { extra:true }); } });
+      } else {
+        opts.push({ t:"매매 — 지도에서 단지 고르기", d:`${year}년 실거래 시세로 수도권 아파트를 직접 고릅니다. 대출이 필요하면 단지를 고른 뒤 대출 금액을 정합니다.`, tag:"지도", fn:()=>{ extraTradeSnap = snapshotState(); renderMapBuy(st, "집 사고팔기", { extra:true }); } });
+      }
+      box.innerHTML = opts.map((o,i)=>`<button class="choice" data-i="${i}" type="button"><span class="t">${o.t} ${o.tag?`<span class="tag">${o.tag}</span>`:""}</span><span class="d">${o.d}</span></button>`).join("");
+      box.querySelectorAll(".choice").forEach((b,i)=> b.onclick = ()=> opts[i].fn());
+      document.getElementById("btnExtraBack").onclick = ()=>{ extraTradeSnap = null; renderStage(); };
+    }
+    function renderExtraTradeResult(st, res, before){
+      const delta = netWorth() - before;
+      app.innerHTML = `<div class="card fade">
+        <div class="kicker">${S.age}세 · 집 사고팔기 미리보기</div>
+        <h2>${S.house ? aptById(S.house.aptId).name + " — 거래를 마쳤습니다" : "거래를 마쳤습니다"}</h2>
+        <div class="result-hero"><div class="tiny muted" style="font-weight:700">순자산 변화</div>
+        <div class="delta ${delta>0?"plus":delta<0?"minus":""} num">${delta===0?"±0원":(delta>0?"+":"")+fmt(delta)}</div></div>
+        <div class="log"><ul>${res.lines.filter(Boolean).map(t=>`<li><span class="dot"></span><span>${t}</span></li>`).join("")}</ul></div>
+        <p class="statline" style="margin-top:8px">${worldStatLine(curYear())}</p>
+        <span class="src">${res.source}</span>
+        <p class="small muted" style="margin-top:8px">아직 확정된 거래가 아닙니다. 거래를 취소하면 거래 전 상태로 돌아가고, 확정하면 이 단계의 선택 화면으로 돌아가 원래 선택을 이어서 고를 수 있습니다.</p>
+        <div class="btn-row">
+          ${extraTradeSnap ? `<button class="btn ghost" id="btnExtraUndo" type="button">← 거래 취소하고 돌아가기</button>` : ""}
+          <button class="btn accent" id="btnExtraDone" type="button">거래 확정 · 이 단계 선택으로 돌아가기 →</button>
+        </div>
+      </div>`;
+      scrollTop(); updateHUD();
+      if (extraTradeSnap){
+        document.getElementById("btnExtraUndo").onclick = ()=>{
+          const snap = extraTradeSnap;
+          extraTradeSnap = null;
+          restoreState(snap);
+          renderStage();
+        };
+      }
+      document.getElementById("btnExtraDone").onclick = ()=>{ extraTradeSnap = null; renderStage(); };
     }
 
     /* ---------- 주담대 계산 화면: 대출액을 직접 골라 매수/분양대금 납부를 확정한다 ----------
@@ -1647,7 +2170,8 @@
           `${year}년 대출 규제 적용 — 기준금리 ${macro(year).rate.toFixed(2)}%(한국은행) · LTV 상한 ${ltvLabel} · 소득 상한 ${incomeLabel} (${reg.title} · ${reg.measure})`,
           apt.note
         ];
-        housingResult(st, { lines, source: cfg.source }, before);
+        if (cfg.onDone) cfg.onDone({ lines, source: cfg.source }, before); // 추가 행동 거래면 주거 단계로 정산하지 않고 거래 결과 화면으로 간다
+        else housingResult(st, { lines, source: cfg.source }, before);
       };
       if (fallbackBox){
         document.getElementById("fbLoanBuy").onclick = ()=> renderMapBuy(st);
@@ -1655,7 +2179,8 @@
       }
     }
 
-    function renderMapBuy(st, label){
+    function renderMapBuy(st, label, opts){
+      const isExtra = !!(opts && opts.extra); // 추가 행동(집 사고팔기)에서 열린 지도면 확정·뒤로가기 모두 거래 흐름으로 되돌린다
       const year = curYear();
       const list = APTS.filter(a => a.built <= year || a.anchors[0][0] <= year + 1);
       let sortKey = "priceAsc";
@@ -1672,7 +2197,7 @@
           ${[["priceAsc","가격 낮은 순"],["priceDesc","가격 높은 순"],["school","학군"],["station","역세권"],["product","상품성"]].map(([k,v])=>`<button data-k="${k}" class="${k===sortKey?"on":""}" type="button">${v}</button>`).join("")}
         </div>
         <div class="apt-list" id="aptList"></div>
-        <div class="btn-row"><button class="btn ghost" id="btnBack" type="button">전략 다시 고르기</button></div>
+        <div class="btn-row"><button class="btn ghost" id="btnBack" type="button">${isExtra ? "거래 화면으로 돌아가기" : "전략 다시 고르기"}</button></div>
       </div>`;
       scrollTop();
       const listEl = document.getElementById("aptList");
@@ -1715,7 +2240,8 @@
                 : "현금이 집값에 모자랍니다. 은행 주택담보대출로 부족분을 메우면 살 수 있습니다. 대출 금액은 한도 안에서 직접 정할 수 있습니다.",
               confirmLabel: "매수 확정하기",
               source:"국토교통부 실거래가 공개시스템·KB부동산 시세의 단지별 대표 거래가 근사, 한국은행 기준금리, 금융위원회 LTV·DSR 규제 기준",
-              back: ()=> renderMapBuy(st, label) });
+              onDone: isExtra ? (res, before)=> renderExtraTradeResult(st, res, before) : null,
+              back: ()=> renderMapBuy(st, label, opts) });
           };
         });
         listEl.querySelectorAll(".apt").forEach(el=>{
@@ -1747,7 +2273,14 @@
           draw();
         };
       });
-      document.getElementById("btnBack").onclick = ()=>{ if (housingSnap){ const snap = housingSnap; housingSnap = null; restoreState(snap); } renderHousingIntro(st); };
+      document.getElementById("btnBack").onclick = ()=>{
+        if (isExtra){ // 추가 행동 거래: 갈아타기로 이미 매도했더라도 거래 전 상태로 되돌리고 거래 화면으로 돌아간다
+          if (extraTradeSnap) restoreState(extraTradeSnap);
+          renderExtraTradeIntro(st);
+          return;
+        }
+        if (housingSnap){ const snap = housingSnap; housingSnap = null; restoreState(snap); } renderHousingIntro(st);
+      };
     }
 
     function renderCheongyak(st){
