@@ -245,6 +245,33 @@
         border-radius:12px;padding:8px 16px}
       .apt .buy{margin-top:16px;width:100%}
 
+      /* ---------- 주담대 규제 안내 박스 ---------- */
+      .regbox{margin-top:16px;background:var(--accent-soft);border:1px solid var(--line);border-radius:12px;padding:16px;
+        font-size:14px;line-height:1.6;color:var(--ink2)}
+      .regbox b{color:var(--ink)}
+      .regbox .src{margin-top:8px}
+
+      /* ---------- 주담대 (대출 계산 화면) ---------- */
+      .loan-badge{display:inline-flex;align-items:center;gap:4px;font-size:13px;font-weight:700;border-radius:999px;
+        padding:4px 12px;background:var(--gold-soft);color:var(--gold);border:1px solid var(--gold-line)}
+      .loan-ctrl{margin-top:16px;background:var(--surface2);border:1px solid var(--line);border-radius:12px;padding:16px}
+      .loan-ctrl .lab-row{display:flex;justify-content:space-between;align-items:baseline;gap:8px;flex-wrap:wrap}
+      .loan-ctrl .lab-row .k{font-size:13px;font-weight:600;color:var(--ink3)}
+      .loan-ctrl .lab-row .v{font-size:20px;font-weight:700;color:var(--ink)}
+      input[type=range].loan-range{width:100%;margin:16px 0 8px;accent-color:var(--accent);height:28px;cursor:pointer}
+      .loan-input-row{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:8px}
+      .loan-input-row input[type=number]{flex:1 1 160px;width:auto;height:44px;padding:0 16px;border-radius:8px;border:1px solid var(--line);
+        background:var(--surface);color:var(--ink);font:inherit;font-size:15px;font-weight:600}
+      .loan-input-row input[type=number]:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px rgba(37,99,235,.18)}
+      .loan-input-row .unit{font-size:13px;font-weight:500;color:var(--ink3)}
+      .loan-quick{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
+      .loan-quick button{border:1px solid var(--line);background:var(--surface);border-radius:8px;height:36px;padding:0 16px;
+        font-size:13px;font-weight:500;color:var(--ink2);transition:var(--ease)}
+      .loan-quick button:hover{transform:translateY(-1px);border-color:var(--accent);color:var(--accent)}
+      .loan-quick button:active{transform:scale(.98)}
+      .loan-warn{margin-top:12px;font-size:13px;font-weight:600;color:var(--up)}
+      .loan-ok{margin-top:12px;font-size:13px;font-weight:600;color:var(--teal)}
+
       /* ---------- final ---------- */
       .final-net{text-align:center;padding:8px 0}
       .final-net .v{font-family:var(--font);font-size:clamp(26px,7vw,36px);font-weight:700;line-height:1.25;letter-spacing:-.03em;color:var(--ink)}
@@ -410,6 +437,71 @@
       2023:[3.50,2655,2.7,3.6], 2024:[3.00,2399,2.8,2.3]
     };
     const ASSUME = { rate:3.0, kospiGrowth:0.06, unemp:2.8, cpi:2.0 }; // 2025년 이후 장기 가정
+    /* ---------- 연도별 주담대 규제 (수도권·무주택/1주택 구입 기준, 게임용 단순화) ----------
+       연말에 시행 중이던 규제를 그 해의 대표값으로 쓴다 (연중에 대책이 바뀐 해는 measure에 그 경위를 적었다).
+       소득 상한은 시대별 지표명을 그대로 쓴다: DTI(2018.9까지) → DSR(2018.10 도입). 도입 전(2002년까지)은 소득 상한 없음.
+       2023년 LTV 50%·15억 초과 금지 해제는 금융위원회 보도자료(2022.11.10 대책, 2022.12.1 시행 — 규제지역 LTV 50% 단일화)로 확인했다 */
+    const LOAN_REGS = [
+      { from:1999, to:2002, ltv:0.60, incomeType:null, incomeRatio:0, title:"LTV 도입기",
+        measure:"2002.9 투기과열지구 LTV 60% 첫 시행, 2002.10 전 지역으로 확대",
+        note:"소득 규제(DTI)가 없던 시절이라, 한도는 집값 대비 비율만으로 정해졌습니다." },
+      { from:2003, to:2008, ltv:0.40, incomeType:"DTI", incomeRatio:0.40, title:"10·29 대책 이후",
+        measure:"2003.10.29 대책 — 투기지역 아파트 LTV 40%. 2006.3부터 투기지역 6억 초과 아파트에 DTI 40% 추가",
+        note:"" },
+      { from:2009, to:2013, ltv:0.50, incomeType:"DTI", incomeRatio:0.40, title:"금융위기 이후 긴축",
+        measure:"2009.7 수도권 LTV를 60%에서 50%로 강화",
+        note:"" },
+      { from:2014, to:2016, ltv:0.70, incomeType:"DTI", incomeRatio:0.60, title:"LTV·DTI 일원화 완화기",
+        measure:"2014.7.24 조치 — 전 금융권 LTV 70%·수도권 DTI 60%로 일원화 (2017년 대책들 전까지 유지)",
+        note:"연도별 규제 가운데 가장 대출받기 쉬웠던 구간입니다." },
+      { from:2017, to:2017, ltv:0.40, incomeType:"DTI", incomeRatio:0.40, title:"8·2 대책",
+        measure:"2017.6.19 대책(조정대상지역 LTV 60%)을 거쳐 2017.8.2 대책 — 투기과열지구·투기지역 LTV 40%·DTI 40%",
+        note:"한 해에 두 번 규제가 바뀌어, 연말에 시행 중이던 8·2 대책 기준으로 적용했습니다." },
+      { from:2018, to:2018, ltv:0.40, incomeType:"DSR", incomeRatio:0.40, title:"DSR 도입",
+        measure:"2018.10 DSR 제1금융권 도입(2019.6 제2금융권 확대) — 모든 가계대출의 원리금을 소득과 비교",
+        note:"연말에 시행 중이던 DSR 기준으로 적용했습니다." },
+      { from:2019, to:2022, ltv:0.40, tiered:true, ban15:true, incomeType:"DSR", incomeRatio:0.40, title:"12·16 대책",
+        measure:"2019.12.16 대책 — 투기지역 LTV 40%, 시가 9억 초과분은 20%, 시가 15억 초과 주택은 주담대 금지",
+        note:"비싼 집일수록 대출이 급격히 막히던 시절입니다." },
+      { from:2023, to:2024, ltv:0.50, incomeType:"DSR", incomeRatio:0.40, title:"규제 완화기",
+        measure:"2022.11.10 대책·2023.1 규제지역 대폭 해제 — 규제지역 LTV 50% 단일화, 시가 15억 초과 주담대 금지 해제 (금융위원회)",
+        note:"" },
+      { from:2025, to:9999, ltv:0.40, absCap:true, incomeType:"DSR", incomeRatio:0.40, title:"가계부채 관리 강화",
+        measure:"2025.6.27 가계부채 관리 강화방안(LTV 40%·주담대 한도 6억)을 거쳐 2025.10.15 대책 — 구간별 한도(15억 이하 6억·15~25억 4억·25억 초과 2억), 서울 전역 규제지역",
+        note:"" }
+    ];
+    const LOAN_REG_SRC = "금융위원회·국토교통부 대책 자료, 국토연구원·한국부동산분석학회 LTV 규제 변천 정리";
+    function loanRegFor(year){
+      const r = LOAN_REGS.find(x => year >= x.from && year <= x.to) || LOAN_REGS[LOAN_REGS.length-1];
+      return Object.assign({}, r, { assumed: year >= 2026 }); // 2026년 이후는 2025년 규제 유지 가정
+    }
+    function ltvCapFor(price, reg){ // 그 해 규제 기준 LTV 한도액(만원)과 대출 금지 여부
+      if (reg.ban15 && price > 150000) return { cap:0, banned:true }; // 시가 15억 초과 주담대 금지 (12·16 대책)
+      let cap;
+      if (reg.tiered) cap = Math.min(price, 90000) * 0.40 + Math.max(0, Math.min(price, 150000) - 90000) * 0.20; // 9억까지 40%, 초과분 20%
+      else cap = price * reg.ltv;
+      if (reg.absCap){ const abs = price <= 150000 ? 60000 : price <= 250000 ? 40000 : 20000; cap = Math.min(cap, abs); } // 10·15 대책 구간별 한도
+      return { cap, banned:false };
+    }
+    /* ---------- 서울 아파트 중위가격·PIR (KB부동산 발표값 기반 게임용 근사) ----------
+       중위가격 앵커: 2013년 4.9억 · 2016년 5.2억 · 2017년 6.0억 · 2021년 9.7억 · 2022년 10.9억(7월 정점) · 2023년 9.9억 · 2025년 약 9.5억
+       PIR 앵커(KB 3분위): 2008년 7.3배 · 2017년 10.9배 · 2019년 말 13.6배 · 2021년 12월 19.0배(역대 최고) · 2025년 10.6배
+       앵커 사이는 직선 보간, 2026년 이후 중위가격은 연 2.5% 상승·PIR은 2025년 값 유지로 가정한다 */
+    const SEOUL_MEDIAN = [[1999,19000],[2002,26000],[2005,36000],[2008,48000],[2010,47000],[2013,49000],[2016,52000],[2017,60000],[2019,76000],[2021,97000],[2022,109000],[2023,99000],[2025,95000]];
+    const SEOUL_PIR = [[2008,7.3],[2010,8.6],[2013,8.4],[2014,7.9],[2016,10.1],[2017,10.9],[2019,13.6],[2020,13.9],[2021,19.0],[2022,16.8],[2023,13.2],[2025,10.6]];
+    function interpAnchors(T, year, afterGrowth){
+      if (year <= T[0][0]) return T[0][1] * Math.pow(0.99, T[0][0] - year);
+      for (let i=1;i<T.length;i++){ if (year <= T[i][0]){ const [x0,y0]=T[i-1],[x1,y1]=T[i]; return y0 + (y1-y0)*(year-x0)/(x1-x0); } }
+      return T[T.length-1][1] * Math.pow(1 + afterGrowth, year - T[T.length-1][0]);
+    }
+    function seoulMedianAt(y){ return Math.round(interpAnchors(SEOUL_MEDIAN, y, 0.025)); }
+    function seoulPirAt(y){ return Math.round(interpAnchors(SEOUL_PIR, y, 0) * 10) / 10; }
+    function pirDifficulty(pir){ // 단정 대신 PIR 수치에 붙는 서술
+      if (pir <= 8) return "월급을 모아 사기 상대적으로 수월했던 시기";
+      if (pir <= 11) return "버거워지기 시작한 시기";
+      if (pir <= 14) return "월급만으로는 벅찼던 시기";
+      return "소득 대비 집값이 역대급으로 벌어졌던 시기";
+    }
     function macro(y){
       if (MACRO[y]) { const m=MACRO[y]; return {rate:m[0],kospi:m[1],unemp:m[2],cpi:m[3],real:true}; }
       if (y>2024) return {rate:ASSUME.rate, kospi:Math.round(2399*Math.pow(1.06,y-2024)), unemp:ASSUME.unemp, cpi:ASSUME.cpi, real:false};
@@ -611,7 +703,8 @@
       if (S.house) chips.push(`주택 <b>${fmtShort(houseValue())}</b>`);
       else if (S.jeonse > 1) chips.push(`전세보증금 <b>${fmtShort(S.jeonse)}</b>`);
       if (extraValue() > 1) chips.push(`투자부동산 <b>${fmtShort(extraValue())}</b>`);
-      if (totalDebt() > 1) chips.push(`<span class="chip neg">대출·부채 <b>${fmtShort(totalDebt())}</b></span>`);
+      if (S.loan > 1) chips.push(`<span class="chip neg">대출 있음 · 주담대 잔액 <b>${fmtShort(S.loan)}</b> · 연 상환 <b>${fmtShort(S.loanPay)}</b>${S.loanYearsLeft > 0 ? ` · 남은 만기 <b>${S.loanYearsLeft}년</b>` : ""}</span>`);
+      else if (totalDebt() > 1) chips.push(`<span class="chip neg">대출·부채 <b>${fmtShort(totalDebt())}</b></span>`);
       if (S.salary > 0) chips.push(`연봉 <b>${fmtShort(S.salary)}</b>`);
       document.getElementById("hudChips").innerHTML = chips.map(c=> c.startsWith("<span") ? c : `<span class="chip">${c}</span>`).join("");
       const prog = document.getElementById("hudProg");
@@ -623,6 +716,7 @@
       const logs = [];
       const startAge = S.age, startYear = curYear();
       let invStart = S.invest, houseStart = houseValue();
+      let loanPaidYears = 0, loanPaidTotal = 0; // 이 구간에 실제로 빠져나간 주담대 원리금 (정산 로그용)
       while (S.age < toAge){
         S.age++;
         const y = curYear(), m = macro(y);
@@ -638,7 +732,9 @@
             const interest = S.loan * S.loanRate;
             const principal = Math.min(S.loan, Math.max(0, S.loanPay - interest));
             S.loan -= principal; save -= S.loanPay;
-            if (S.loan <= 0){ S.loan = 0; S.loanPay = 0; }
+            loanPaidYears++; loanPaidTotal += S.loanPay;
+            if (S.loanYearsLeft > 0) S.loanYearsLeft--;
+            if (S.loan <= 0){ S.loan = 0; S.loanPay = 0; S.loanRate = 0; S.loanTerm = 0; S.loanYearsLeft = 0; S.loanStartYear = 0; }
           }
           if (S.jeonseLoan > 0) save -= S.jeonseLoan * 0.045; // 전세대출 이자만 납부
           save = Math.max(save, -S.salary * 0.2);
@@ -657,6 +753,11 @@
         logs.push({cls: S.invest >= invStart ? "good" : "bad", text:`투자자산 ${fmtShort(invStart)} → ${fmtShort(S.invest)} (같은 기간 KOSPI ${kospiAt(startYear).toLocaleString()} → ${kospiAt(curYear()).toLocaleString()}pt)`});
       if (S.house && houseStart > 0)
         logs.push({cls: houseValue() >= houseStart ? "good" : "bad", text:`보유 주택 시가 ${fmtShort(houseStart)} → ${fmtShort(houseValue())}`});
+      if (loanPaidYears > 0)
+        logs.push({cls:"", text: S.loan > 0
+          ? `주담대 원리금 연 ${fmtShort(loanPaidTotal / loanPaidYears)}씩 ${loanPaidYears}년간 자동 상환 — 남은 잔액 ${fmtShort(S.loan)}, 남은 만기 ${S.loanYearsLeft}년`
+          : `주담대 원리금을 ${loanPaidYears}년간 자동 상환해 대출을 모두 갚았습니다`,
+          stat: worldStatLine(curYear())});
       return logs;
     }
 
@@ -674,12 +775,23 @@
     /* 타임라인 "통계 한 줄": 사건이 일어난 해의 세상 지표를 게임 내 거시 데이터(실통계)로 짝짓는다.
        실통계가 없는 구간은 연도 범위로 분기해 밝힌다: 2025년 이후는 게임이 이미 쓰는 장기 평균 가정,
        1999년 이전은 추정치(게임은 1999년부터라 실제로는 닿지 않는 방어 경로) */
+    /* PIR이 크게 움직인 해의 시대 한 줄 — 통계 줄(worldStatLine)에만 붙여 중복을 만들지 않는다 */
+    const PIR_ERA = {
+      2006:"서울 아파트값이 한 해 +23.5% 급등했던 해입니다 (KB부동산)",
+      2012:"집값 하락기 — 서울 실거래가가 내리고 PIR이 바닥권으로 내려가던 시기입니다 (KB부동산)",
+      2017:"서울 중위가격이 6억을 넘고 PIR이 10.9배로 뛰기 시작한 폭등기의 출발점입니다 (KB부동산)",
+      2020:"집값 폭등기 한가운데 — 소득보다 집값이 훨씬 빠르게 올랐습니다 (KB부동산)",
+      2021:"서울 PIR이 19.0배로 역대 최고를 기록한 해입니다 (KB부동산)",
+      2022:"금리 인상과 함께 서울 실거래가가 −22% 조정받은 하락기입니다 (한국부동산원)",
+      2023:"하락 뒤 회복기 — 서울 중위가격은 9.9억 수준으로 내려왔습니다 (KB부동산)"
+    };
     function worldStatLine(y){
       const m = macro(y);
       const core = `${y}년의 세상 — 기준금리 ${m.rate.toFixed(2)}% · KOSPI ${m.kospi.toLocaleString()}pt · 실업률 ${m.unemp.toFixed(1)}% · 물가 ${m.cpi.toFixed(1)}%`;
-      if (m.real) return core + " (한국은행·KRX·통계청)";
-      if (y >= 2025) return core + " (2025년 이후 구간은 게임 내 장기 평균 가정)";
-      return core + " (1999년 이전 추정치)";
+      const era = PIR_ERA[y] ? ` · ${PIR_ERA[y]}` : "";
+      if (m.real) return core + era + " (한국은행·KRX·통계청)";
+      if (y >= 2025) return core + era + " (2025년 이후 구간은 게임 내 장기 평균 가정)";
+      return core + era + " (1999년 이전 추정치)";
     }
     function shockBanner(fromYear, toYear){
       let out = "";
@@ -963,6 +1075,7 @@
       stopShowcase();
       hud.classList.add("hidden");
       const co = cohortOwnership(birth);
+      const pir30 = seoulPirAt(birth + 30), med30 = seoulMedianAt(birth + 30); // 이 세대가 30세가 되는 해의 서울 집값 부담
       app.innerHTML = `<div class="card fade" style="max-width:640px;margin-left:auto;margin-right:auto">
         <div class="kicker">인생 카드 · 시작 전 마지막 확인</div>
         <h2>${birth}년생, ${region}에서 출발합니다</h2>
@@ -974,7 +1087,10 @@
           <div class="lc-row"><span class="k">부모 지원</span><span class="v">없음 — 출발 자산이 전부</span></div>
           <div class="lc-row"><span class="k">학자금 대출</span><span class="v">없음 (19세 진학 선택에서 결정)</span></div>
           <div class="lc-row"><span class="k">첫 장면</span><span class="v">19세 · ${birth+19}년, 수능과 진학의 갈림길</span></div>
+          <div class="lc-row"><span class="k">이 세대의 집 사기 난이도</span><span class="v num">30세가 되는 ${birth+30}년 · PIR ${pir30.toFixed(1)}배</span></div>
         </div>
+        <p class="small" style="margin-top:12px;text-wrap:pretty">${birth+30}년, 서울 아파트 중위가격은 ${fmt(med30)}이었습니다. PIR ${pir30.toFixed(1)}배 — 월급을 한 푼도 안 쓰고 ${pir30.toFixed(1)}년을 모아야 살 수 있는 가격으로, ${pirDifficulty(pir30)}로 꼽힙니다. 태어난 해가 다르면 이 숫자부터 달라집니다.</p>
+        <span class="src">KB부동산 서울 아파트 중위가격·PIR(3분위 기준) 발표값 기반 게임용 근사${birth+30 > 2025 ? " · 2026년 이후는 가정 구간" : ""}</span>
         <div class="lc-prob">
           <div class="tiny muted" style="font-weight:700">현실의 같은 세대 — 가구주 ${co.band}의 주택 소유율</div>
           <div class="pct num">${co.pct}</div>
@@ -996,7 +1112,7 @@
       S = { birth, region, nick:DEFAULT_NICK, age:19, stageIdx:0,
         cash:500, invest:0, jeonse:0, jeonseLoan:0, studentLoan:0,
         salary:0, job:null, saveRate:0.34, allocInv:0, speculative:false,
-        house:null, loan:0, loanRate:0, loanPay:0, extraProp:null,
+        house:null, loan:0, loanRate:0, loanPay:0, loanTerm:0, loanYearsLeft:0, loanStartYear:0, extraProp:null,
         married:false, kids:0, tongjangStart:null, edu:null, eduSpendUntil:0,
         flags:{}, history:[], shocksShown:{}, settleLog:[], lastYear:birth+18 };
       hud.classList.remove("hidden");
@@ -1159,7 +1275,7 @@
         choices:()=>[
           ...(S.house ? [{ t:"다운사이징", d:"지금 집을 팔고 신축 소형으로 옮깁니다. 차액은 현금으로 확보합니다.",
             apply(){ const apt = aptById(S.house.aptId); const sell = houseValue();
-              const settle = sell - S.loan; S.loan = 0; S.loanPay = 0;
+              const settle = sell - S.loan; clearMortgage();
               const newPrice = Math.round(aptPriceAt(aptById("godeok-gracium"), curYear())*0.62);
               S.cash += settle - newPrice; S.house = { aptId:"godeok-gracium", buyYear:curYear(), buyPrice:newPrice, downsized:true };
               return { lines:[`${apt.name} 매도 ${fmt(sell)} (대출 상환 후 ${fmt(settle)})`, `고덕 소형 ${fmt(newPrice)}에 매수, 차액 ${fmt(settle-newPrice)} 현금화`, "1주택 비과세 요건 충족 가정 (보유 2년 이상)"],
@@ -1255,31 +1371,72 @@
     /* ================= 내 집 마련 (핵심 단계) ================= */
     let housingSnap = null; // 주거 단계 진입 시점 스냅샷 — 결과 미리보기에서 전략을 다시 고를 때 복원
     function ownFunds(){ return S.cash + S.invest; }
-    function annualPmtFor(loanAmt, year){ const r = (macro(year).rate + 1.4)/100; return loanAmt * r / (1 - Math.pow(1+r, -30)); }
-    function dsrLimit(){ return (S.salary || 0) * (S.married ? 1.5 : 1) * 0.4; } // DSR 40% (가구소득 근사)
+    function buyFunds(){ return ownFunds() + S.jeonse - S.jeonseLoan; } // 매수 시 전세보증금이 반환되고 전세대출이 상환되므로, 실제 가용 자금은 그 순액까지 포함한다 (doBuy의 정산 순서와 동일)
+    /* ================= 주담대 (주택담보대출) =================
+       규칙 (한국 주담대 제도를 게임용으로 단순화):
+       - 한도: 그 해 실제 규제(데이터 섹션 LOAN_REGS)의 LTV 상한·구간 규칙과 소득 상한(DTI/DSR) 중 낮은 쪽
+       - 금리: 해당 연도 기준금리(한국은행) + 1.5%p
+       - 상환: 원리금균등분할상환, 만기는 30년 또는 60세 은퇴까지 중 짧은 쪽
+       - 상태는 S.loan(잔액)·S.loanRate(연 금리, 소수)·S.loanPay(연 상환액)·S.loanTerm(원 만기)·
+         S.loanYearsLeft(남은 만기)·S.loanStartYear(실행 연도)에 저장되며, 스냅샷 깊은 복사(restoreState)가 함께 다룬다 */
+    const MORTGAGE_SPREAD = 1.5; // 가산금리 %p
+    function mortgageRatePct(year){ return macro(year).rate + MORTGAGE_SPREAD; } // 연 금리(%)
+    function mortgageTermYears(){ return Math.max(1, Math.min(30, 60 - S.age)); } // 30년 vs 은퇴까지 중 짧은 쪽
+    function regLtvLabel(reg){ return reg.tiered ? "40% (시가 9억 초과분 20%)" : Math.round(reg.ltv * 100) + "%"; }
+    function householdIncome(){ return (S.salary || 0) * (S.married ? 1.5 : 1); } // 맞벌이 가구소득 근사 (기존 dsrLimit과 동일 기준)
+    function annualPmtCalc(principal, ratePct, termYears){
+      if (principal <= 0 || termYears <= 0) return 0;
+      const r = ratePct / 100;
+      if (r <= 0) return principal / termYears;
+      return principal * r / (1 - Math.pow(1 + r, -termYears));
+    }
+    function annualPmtFor(loanAmt, year){ return annualPmtCalc(loanAmt, mortgageRatePct(year), mortgageTermYears()); }
+    function dsrLimit(){ const reg = loanRegFor(curYear()); return reg.incomeRatio ? householdIncome() * reg.incomeRatio : Infinity; } // 그 해 소득 상한(DTI/DSR) 기준 연간 원리금 상한(만원)
+    function mortgageLimits(price, year){
+      const ratePct = mortgageRatePct(year), term = mortgageTermYears();
+      const reg = loanRegFor(year);
+      const lc = ltvCapFor(price, reg);
+      const perUnit = annualPmtCalc(1, ratePct, term); // 대출 1만원당 연간 원리금
+      const incomeCapAmt = reg.incomeRatio ? householdIncome() * reg.incomeRatio : Infinity; // 그 해 DTI/DSR 상한액
+      const dsrCap = (isFinite(incomeCapAmt) && perUnit > 0) ? Math.floor(incomeCapAmt / perUnit) : Infinity;
+      const maxLoan = lc.banned ? 0 : Math.max(0, Math.min(Math.floor(lc.cap), isFinite(dsrCap) ? dsrCap : Math.floor(lc.cap)));
+      return { price, ratePct, term, reg, banned: lc.banned, ltvCap: Math.floor(lc.cap),
+        dsrCap: isFinite(dsrCap) ? dsrCap : null, incomeCapAmt: isFinite(incomeCapAmt) ? Math.round(incomeCapAmt) : null,
+        maxLoan, income: householdIncome() };
+    }
+    function mortgageFigures(loanAmt, lim){
+      const annual = annualPmtCalc(loanAmt, lim.ratePct, lim.term);
+      return { annual: Math.round(annual), monthly: Math.round(annual / 12),
+        totalInterest: Math.max(0, Math.round(annual * lim.term - loanAmt)),
+        ltvPct: lim.price > 0 ? loanAmt / lim.price * 100 : 0,
+        dsrPct: lim.income > 0 ? annual / lim.income * 100 : 0 };
+    }
     function payFromFunds(amount){ // 현금 우선, 부족분은 투자 매도
       let pay = amount;
       const fc = Math.min(Math.max(S.cash,0), pay); S.cash -= fc; pay -= fc;
       if (pay > 0){ S.invest -= pay; pay = 0; }
       if (S.cash < 0) S.cash = 0;
     }
-    function doBuy(apt, price, label){
+    function clearMortgage(){ S.loan = 0; S.loanRate = 0; S.loanPay = 0; S.loanTerm = 0; S.loanYearsLeft = 0; S.loanStartYear = 0; }
+    function doBuy(apt, price, label, chosenLoan){
       const year = curYear();
       // 전세 중이면 보증금 반환, 전세대출 상환
       if (S.jeonse > 0){ S.cash += S.jeonse; S.jeonse = 0; }
       if (S.jeonseLoan > 0){ S.cash -= S.jeonseLoan; S.jeonseLoan = 0; }
       const total = Math.round(price * 1.025); // 취득세·중개보수 등 부대비용 2.5%
-      const ltv = ltvEff(year, apt.region);
-      const loanAmt = Math.min(Math.round(price * ltv), Math.max(0, total - 0));
+      const lim = mortgageLimits(price, year);
+      // 대출액은 대출 계산 화면에서 고른 값(없으면 한도 최대). 한도를 넘는 값은 여기서도 잘라낸다
+      const loanAmt = Math.max(0, Math.min(Math.round(chosenLoan == null ? lim.maxLoan : chosenLoan), lim.maxLoan));
       const need = total - loanAmt;
       payFromFunds(need);
       S.house = { aptId: apt.id, buyYear: year, buyPrice: price };
       S.flags.everBought = true;
-      S.loan = loanAmt; S.loanRate = (macro(year).rate + 1.4)/100;
-      const r = S.loanRate, n = 30;
-      S.loanPay = Math.round(loanAmt * r / (1 - Math.pow(1+r, -n)));
+      if (loanAmt > 0){
+        S.loan = loanAmt; S.loanRate = lim.ratePct / 100; S.loanTerm = lim.term; S.loanYearsLeft = lim.term; S.loanStartYear = year;
+        S.loanPay = Math.round(annualPmtCalc(loanAmt, lim.ratePct, lim.term));
+      } else clearMortgage();
       S.history.push({ age:S.age, title:label || "내 집 마련", choice:`${apt.name} 매수 (${fmt(price)})` });
-      return { need, loanAmt, total };
+      return { need, loanAmt, total, ratePct: lim.ratePct, term: lim.term, loanPay: S.loanPay };
     }
     function renderHousingIntro(st){
       housingSnap = null; // 이 단계에서 새로 전략을 고르면 스냅샷도 새로 잡는다
@@ -1293,7 +1450,7 @@
         <h2>${own ? "갈아탈 것인가, 머물 것인가" : "내 집 마련의 시간"}</h2>
         ${macroStrip(year)} ${shock}
         <p style="margin-top:16px">${own
-          ? `현재 ${aptById(S.house.aptId).name} 보유 중, 시가 ${fmt(houseValue())}, 남은 대출 ${fmt(S.loan)}. ${year}년의 가격으로 갈아타면 어디까지 갈 수 있을까요?`
+          ? `현재 ${aptById(S.house.aptId).name} 보유 중, 시가 ${fmt(houseValue())}${S.loan > 0 ? `, <span class="loan-badge">대출 있음</span> 주담대 잔액 ${fmt(S.loan)} · 연 상환 ${fmt(S.loanPay)} · 남은 만기 ${S.loanYearsLeft}년` : ", 남은 대출 없음"}. ${year}년의 가격으로 갈아타면 어디까지 갈 수 있을까요? 팔 때는 매도 대금에서 대출 잔액부터 갚습니다.`
           : `지금 가진 돈은 현금·투자 합쳐 ${fmt(ownFunds())}. 청약 가점은 <b>${cheongyakPoints()}점</b>/84점입니다. 전략부터 고르세요 — 이 선택이 60세 자산의 절반을 결정합니다.`}</p>
         ${settle}
         <div class="choices" id="hChoices"></div>
@@ -1304,7 +1461,7 @@
       if (own){
         opts.push({ t:"지금 집에 머물기", d:"갈아타기 비용과 리스크를 피합니다.", fn:()=>{ housingSnap = snapshotState(); housingResult(st, {lines:["갈아타지 않고 보유를 이어갑니다", `현재 시가 ${fmt(houseValue())}`], source:"—"}, netWorth()); } });
         opts.push({ t:"갈아타기 — 매도 후 지도에서 고르기", d:"지금 집을 팔고(1주택 비과세 가정) 더 나은 입지로 이동합니다.", tag:"핵심 선택", fn:()=>{ housingSnap = snapshotState(); sellHouse(); renderMapBuy(st, "갈아타기"); } });
-        opts.push({ t:"매도 후 전세로", d:"집값이 비싸다고 판단될 때. 차익을 현금화하고 기다립니다.", fn:()=>{ housingSnap = snapshotState(); const before = netWorth(); sellHouse(); doJeonse(); housingResult(st, {lines:["주택을 매도하고 전세로 전환했습니다", `전세보증금 ${fmt(S.jeonse)} (자산으로 보유)`], source:"국토교통부 실거래가 · 전세가율 근사"}, before); } });
+        opts.push({ t:"매도 후 전세로", d:"집값이 비싸다고 판단될 때. 차익을 현금화하고 기다립니다.", fn:()=>{ housingSnap = snapshotState(); const before = netWorth(); const repaid = sellHouse(); doJeonse(); housingResult(st, {lines:[...(repaid > 0 ? [`매도 대금에서 주담대 잔액 ${fmt(repaid)}을 먼저 상환했습니다`] : []), "주택을 매도하고 전세로 전환했습니다", `전세보증금 ${fmt(S.jeonse)} (자산으로 보유)`], source:"국토교통부 실거래가 · 전세가율 근사"}, before); } });
       } else {
         opts.push({ t:"매매 — 지도에서 단지 고르기", d:`${year}년 실거래 시세로 수도권 아파트를 직접 고릅니다. 입지·학군·상품성을 비교하세요.`, tag:"핵심 선택", fn:()=>{ housingSnap = snapshotState(); renderMapBuy(st); } });
         opts.push({ t:"청약 도전", d:`내 가점 ${cheongyakPoints()}점으로 분양에 도전합니다. 분양가상한제로 시세보다 싸게 살 기회.`, tag:"가점제", fn:()=>{ housingSnap = snapshotState(); renderCheongyak(st); } });
@@ -1314,9 +1471,11 @@
       box.querySelectorAll(".choice").forEach((b,i)=> b.onclick = ()=> opts[i].fn());
     }
     function sellHouse(){
-      if (!S.house) return;
-      S.cash += houseValue() - S.loan;
-      S.house = null; S.loan = 0; S.loanPay = 0;
+      if (!S.house) return 0;
+      const repaid = S.loan; // 매도 대금에서 주담대 잔액을 먼저 갚고 남은 차액만 손에 쥔다
+      S.cash += houseValue() - repaid;
+      S.house = null; clearMortgage();
+      return repaid;
     }
     function doJeonse(){
       const mult = S.region.includes("서울") ? 1.0 : S.region.includes("인천") ? 0.62 : 0.78;
@@ -1356,6 +1515,146 @@
       document.getElementById("btnNext").onclick = ()=>{ housingSnap = null; advance(); };
     }
 
+    /* ---------- 주담대 계산 화면: 대출액을 직접 골라 매수/분양대금 납부를 확정한다 ----------
+       상태는 건드리지 않는다(확정 버튼에서만 doBuy 실행). 뒤로 가면 호출 화면(지도/청약)으로 돌아가고,
+       그 화면들의 '전략 다시 고르기'가 housingSnap 복원을 맡는다 */
+    function renderLoanBuy(st, cfg){
+      // cfg: { apt, price, label, heading, sub, source, back: fn, fallback: "cheongyak"|null }
+      const year = curYear();
+      const apt = cfg.apt, price = Math.round(cfg.price);
+      const total = Math.round(price * 1.025);
+      const lim = mortgageLimits(price, year);
+      const reg = lim.reg;
+      const ltvLabel = regLtvLabel(reg);
+      const incomeLabel = reg.incomeType ? `${reg.incomeType} ${Math.round(reg.incomeRatio * 100)}%` : "소득 상한 없음";
+      const funds = buyFunds();
+      // 기본값: 현금이 부족하면 부족분을 메우는 만큼, 충분하면 0원(대출 없이도 살 수 있음을 먼저 보여준다)
+      let loanAmt = Math.max(0, Math.min(lim.maxLoan, total - funds));
+      const step = 100; // 100만원 단위
+      app.innerHTML = `<div class="card fade">
+        <div class="kicker">${year}년 · 주택담보대출 계산</div>
+        <h2>${cfg.heading}</h2>
+        <p class="small muted">${cfg.sub}</p>
+        <div class="regbox">
+          <b>${year}년 대출 규제 — ${reg.title}</b><br>
+          LTV 상한 ${ltvLabel} · 소득 상한 ${incomeLabel}${reg.absCap ? " · 가격 구간별 대출 한도(15억 이하 6억 · 15~25억 4억 · 25억 초과 2억)" : ""}${reg.ban15 ? " · 시가 15억 초과 주택은 주담대 금지" : ""}<br>
+          <span class="small muted">${reg.measure}</span>
+          ${reg.note ? `<br><span class="small muted">${reg.note}</span>` : ""}
+          ${reg.assumed ? `<br><span class="small muted">※ 2026년 이후 규제는 2025년 기준 규제를 유지하는 것으로 가정한 값입니다.</span>` : ""}
+          <br><span class="src">${LOAN_REG_SRC}</span>
+        </div>
+        <div class="lc-rows">
+          <div class="lc-row"><span class="k">${cfg.priceLabel || "집값 (전용 84㎡)"}</span><span class="v num">${fmt(price)}</span></div>
+          <div class="lc-row"><span class="k">취득세 등 부대비용 (2.5%)</span><span class="v num">${fmt(total - price)}</span></div>
+          <div class="lc-row"><span class="k">총 필요 금액</span><span class="v num">${fmt(total)}</span></div>
+          <div class="lc-row"><span class="k">가용 자금 (현금·투자${S.jeonse > 0 ? " + 전세보증금 반환분(전세대출 상환 후)" : ""})</span><span class="v num">${fmt(funds)}</span></div>
+          <div class="lc-row"><span class="k">대출 금리</span><span class="v num">연 ${lim.ratePct.toFixed(2)}% <span class="small muted" style="font-weight:500">(기준금리 ${macro(year).rate.toFixed(2)}% + 1.5%p)</span></span></div>
+          <div class="lc-row"><span class="k">상환 방식 · 만기</span><span class="v">원리금균등분할상환 · ${lim.term}년 ${lim.term < 30 ? "(60세 은퇴까지가 30년보다 짧아 만기가 줄었습니다)" : "(최장 30년)"}</span></div>
+          <div class="lc-row"><span class="k">대출 한도 — LTV (${year}년 상한 ${ltvLabel})</span><span class="v num">${lim.banned ? "대출 금지" : fmt(lim.ltvCap)}</span></div>
+          <div class="lc-row"><span class="k">대출 한도 — ${reg.incomeType ? reg.incomeType + " (연 소득 " + fmt(lim.income) + "의 " + Math.round(reg.incomeRatio * 100) + "%까지 연간 상환)" : "소득 상한 규제 (DTI 도입 전)"}</span><span class="v num">${lim.dsrCap == null ? "상한 없음" : fmt(lim.dsrCap)}</span></div>
+          <div class="lc-row"><span class="k">대출 가능 금액 (규제 한도 중 낮은 쪽)</span><span class="v num" style="color:var(--accent)">${fmt(lim.maxLoan)}</span></div>
+        </div>
+        <div class="loan-ctrl">
+          <div class="lab-row"><span class="k">받을 대출 금액 — 직접 정하세요</span><span class="v num" id="loanAmtShow">${fmt(loanAmt)}</span></div>
+          <input type="range" class="loan-range" id="loanRange" min="0" max="${lim.maxLoan}" step="${step}" value="${loanAmt}" ${lim.maxLoan <= 0 ? "disabled" : ""} aria-label="대출 금액 슬라이더 (만원)" />
+          <div class="loan-input-row">
+            <input type="number" id="loanInput" min="0" max="${lim.maxLoan}" step="${step}" value="${loanAmt}" ${lim.maxLoan <= 0 ? "disabled" : ""} aria-label="대출 금액 직접 입력 (만원 단위)" />
+            <span class="unit">만원 (0원부터 한도 ${fmt(lim.maxLoan)}까지)</span>
+          </div>
+          <div class="loan-quick">
+            <button type="button" id="loanQ0">대출 없이</button>
+            <button type="button" id="loanQNeed">부족분만</button>
+            <button type="button" id="loanQMax">한도 최대</button>
+          </div>
+          <div id="loanMsg"></div>
+        </div>
+        <div class="lc-rows" id="loanFigs"></div>
+        <p class="statline" style="margin-top:12px">${worldStatLine(year)} · 이 해 주담대 LTV 상한 ${ltvLabel} (${reg.title}, 금융위원회)</p>
+        <span class="src">한국은행 기준금리 ${macro(year).rate.toFixed(2)}% (${year}년) + 가산금리 1.5%p = 대출금리 연 ${lim.ratePct.toFixed(2)}% · ${year}년 대출 규제: LTV ${ltvLabel} · ${incomeLabel} (${reg.measure})</span>
+        <div class="btn-row">
+          <button class="btn ghost" id="btnLoanBack" type="button">← 돌아가기</button>
+          <button class="btn accent" id="btnLoanConfirm" type="button">이 조건으로 ${cfg.confirmLabel || "매수 확정하기"}</button>
+        </div>
+        ${cfg.fallback === "cheongyak" ? `<div class="choices" id="loanFallback" style="display:none">
+          <button class="choice" id="fbLoanBuy" type="button"><span class="t">매매로 전환 — 지도에서 고르기</span><span class="d">감당 가능한 가격대의 단지를 찾습니다.</span></button>
+          <button class="choice" id="fbLoanJeonse" type="button"><span class="t">전세로 기다리기</span><span class="d">종잣돈을 더 모읍니다.</span></button>
+        </div>` : ""}
+      </div>`;
+      scrollTop();
+      const range = document.getElementById("loanRange"), input = document.getElementById("loanInput");
+      const show = document.getElementById("loanAmtShow"), figs = document.getElementById("loanFigs");
+      const msg = document.getElementById("loanMsg"), confirmBtn = document.getElementById("btnLoanConfirm");
+      const fallbackBox = document.getElementById("loanFallback");
+      function paint(){
+        loanAmt = Math.max(0, Math.min(lim.maxLoan, Math.round(loanAmt) || 0));
+        range.value = loanAmt;
+        if (document.activeElement !== input) input.value = loanAmt; // 입력 중인 칸은 덮어쓰지 않는다 (지우다 0으로 되돌아가는 문제 방지)
+        show.textContent = fmt(loanAmt);
+        const f = mortgageFigures(loanAmt, lim);
+        const need = total - loanAmt;
+        const afford = funds >= need;
+        figs.innerHTML = `
+          <div class="lc-row"><span class="k">내 돈으로 낼 금액 (자기자본)</span><span class="v num">${fmt(need)}</span></div>
+          <div class="lc-row"><span class="k">월 상환액</span><span class="v num">${loanAmt > 0 ? fmt(f.monthly) : "—"}</span></div>
+          <div class="lc-row"><span class="k">연간 상환액 (매년 정산 때 소득에서 자동 차감)</span><span class="v num">${loanAmt > 0 ? fmt(f.annual) : "—"}</span></div>
+          <div class="lc-row"><span class="k">만기까지 총 이자</span><span class="v num">${loanAmt > 0 ? fmt(f.totalInterest) : "—"}</span></div>
+          <div class="lc-row"><span class="k">LTV (집값 대비 대출)</span><span class="v num">${f.ltvPct.toFixed(1)}% / ${year}년 상한 ${ltvLabel}</span></div>
+          <div class="lc-row"><span class="k">${reg.incomeType || "DSR"} (연 소득 대비 연간 상환)</span><span class="v num">${f.dsrPct.toFixed(1)}% / ${reg.incomeType ? "최대 " + Math.round(reg.incomeRatio * 100) + "%" : "상한 없음"}</span></div>
+          ${loanAmt > 0 ? `<div class="lc-row"><span class="k">대출 상태</span><span class="v"><span class="loan-badge">대출 있음</span> 잔액 ${fmt(loanAmt)} · 남은 만기 ${lim.term}년</span></div>` : ""}`;
+        if (lim.banned){
+          msg.innerHTML = `<p class="loan-warn">이 집은 시가 15억을 넘어, ${year}년 시행 중이던 2019.12.16 대책(12·16 대책)상 주택담보대출 자체가 금지됩니다. 그래서 대출 가능 금액이 0원입니다.${afford ? " 다만 대출 없이 전액 자기자본으로는 살 수 있습니다." : ` 전액 자기자본으로도 ${fmt(need - funds)}이 모자라 이 집은 살 수 없습니다.`}</p>`;
+          confirmBtn.disabled = !afford;
+          if (fallbackBox) fallbackBox.style.display = afford ? "none" : "";
+        } else if (!afford && funds >= total - lim.maxLoan){
+          // 한도까지 받으면 살 수 있는데, 지금 고른 대출액이 작아 자기자본이 모자라는 경우 — "한도까지 받아도 못 산다"고 하면 거짓말이 된다
+          msg.innerHTML = `<p class="loan-warn">지금 고른 대출 금액으로는 자기자본이 ${fmt(need - funds)} 모자랍니다. 대출을 ${fmt(total - funds)}까지 올리면 살 수 있습니다.</p>`;
+          confirmBtn.disabled = true;
+          if (fallbackBox) fallbackBox.style.display = "none";
+        } else if (!afford){
+          msg.innerHTML = `<p class="loan-warn">대출을 한도까지 받아도 자기자본이 ${fmt(need - funds)} 모자라 이 집은 살 수 없습니다. 더 저렴한 단지를 고르거나 전세로 기다려야 합니다.</p>`;
+          confirmBtn.disabled = true;
+          if (fallbackBox) fallbackBox.style.display = "";
+        } else {
+          msg.innerHTML = loanAmt > 0
+            ? `<p class="loan-ok">구매할 수 있습니다. 매수 후 매년 정산에서 원리금 ${fmt(f.annual)}이 자동 차감되고, 팔 때는 매도 대금에서 잔액부터 갚습니다.</p>`
+            : `<p class="loan-ok">대출 없이 내 돈으로만 구매할 수 있습니다. 레버리지를 쓰려면 위에서 대출 금액을 올려 보세요.</p>`;
+          confirmBtn.disabled = false;
+          if (fallbackBox) fallbackBox.style.display = "none";
+        }
+      }
+      range.addEventListener("input", ()=>{ loanAmt = parseInt(range.value, 10) || 0; paint(); });
+      input.addEventListener("input", ()=>{ loanAmt = parseInt(input.value, 10) || 0; paint(); });
+      input.addEventListener("change", ()=>{ loanAmt = parseInt(input.value, 10) || 0; paint(); });
+      document.getElementById("loanQ0").onclick = ()=>{ loanAmt = 0; paint(); };
+      document.getElementById("loanQNeed").onclick = ()=>{ loanAmt = Math.max(0, Math.min(lim.maxLoan, total - funds)); paint(); };
+      document.getElementById("loanQMax").onclick = ()=>{ loanAmt = lim.maxLoan; paint(); };
+      paint();
+      document.getElementById("btnLoanBack").onclick = cfg.back;
+      confirmBtn.onclick = ()=>{
+        if (confirmBtn.disabled) return;
+        confirmBtn.disabled = true; // 확정 처리 중 재클릭으로 doBuy가 두 번 실행되는 것을 막는다
+        const before = netWorth();
+        const r = doBuy(apt, price, cfg.label, loanAmt);
+        const f = mortgageFigures(r.loanAmt, lim);
+        const lines = [
+          `${apt.name} 전용 84㎡를 ${fmt(price)}에 매수 (${year}년 ${cfg.label === "청약 당첨" ? "분양가" : "시세"})`,
+          `자기자본 ${fmt(r.need)} + 주택담보대출 ${fmt(r.loanAmt)} (취득세 등 포함 총 ${fmt(r.total)})`,
+          ...(r.loanAmt > 0 ? [
+            `<span class="loan-badge">대출 있음</span> 금리 연 ${r.ratePct.toFixed(2)}% (한국은행 기준금리 ${macro(year).rate.toFixed(2)}% + 1.5%p) · ${r.term}년 원리금균등`,
+            `월 상환 ${fmt(f.monthly)} · 연 상환 ${fmt(r.loanPay)} · 만기까지 총 이자 약 ${fmt(f.totalInterest)} · LTV ${f.ltvPct.toFixed(1)}% · ${reg.incomeType || "DSR"} ${f.dsrPct.toFixed(1)}%`,
+            "매년 정산 때 원리금이 소득에서 자동 차감되고, 매도할 때는 매도 대금에서 잔액부터 갚습니다"
+          ] : ["대출 없이 자기자본만으로 매수했습니다"]),
+          `${year}년 대출 규제 적용 — 기준금리 ${macro(year).rate.toFixed(2)}%(한국은행) · LTV 상한 ${ltvLabel} · 소득 상한 ${incomeLabel} (${reg.title} · ${reg.measure})`,
+          apt.note
+        ];
+        housingResult(st, { lines, source: cfg.source }, before);
+      };
+      if (fallbackBox){
+        document.getElementById("fbLoanBuy").onclick = ()=> renderMapBuy(st);
+        document.getElementById("fbLoanJeonse").onclick = ()=>{ const bf = netWorth(); doJeonse(); housingResult(st, {lines:[`전세보증금 ${fmt(S.jeonse)}으로 거주`, "청약통장은 유지 — 다음 도전에서 가점이 더 오릅니다"], source:"한국부동산원 청약홈"}, bf); };
+      }
+    }
+
     function renderMapBuy(st, label){
       const year = curYear();
       const list = APTS.filter(a => a.built <= year || a.anchors[0][0] <= year + 1);
@@ -1364,7 +1663,9 @@
         <div class="kicker">${year}년 시세 · 전용 84㎡ 기준</div>
         <h2>지도에서 고르는 내 집</h2>
         <p class="small muted">지도의 번호와 아래 카드가 연결됩니다. 학군·역세권·상품성 점수와 가격을 함께 보세요.
-        대출은 ${year}년 규제 기준 LTV(서울 ${Math.round(ltvEff(year,"서울")*100)}% · 경기 ${Math.round(ltvEff(year,"경기")*100)}%, 생애최초 완화 포함), 금리 연 ${(macro(year).rate+1.4).toFixed(2)}%(기준금리+1.4%p), 30년 원리금균등으로 계산합니다. 가용 자금 ${fmt(ownFunds())}.</p>
+        현금이 부족해도 주택담보대출로 살 수 있습니다 — 단지를 고르면 대출 금액을 직접 정하는 계산 화면이 열립니다.
+        대출 한도는 그 해의 실제 규제를 따릅니다: ${year}년 LTV 상한 ${regLtvLabel(loanRegFor(year))}${loanRegFor(year).incomeType ? ` · ${loanRegFor(year).incomeType} ${Math.round(loanRegFor(year).incomeRatio * 100)}%` : " · 소득 상한 없음"} (${loanRegFor(year).title}), 금리는 기준금리 ${macro(year).rate.toFixed(2)}%(한국은행) + 1.5%p = 연 ${mortgageRatePct(year).toFixed(2)}%, 만기는 30년 또는 60세까지 중 짧은 쪽(${mortgageTermYears()}년), 원리금균등분할상환입니다. 가용 자금 ${fmt(buyFunds())}.</p>
+        <p class="statline" style="margin-top:4px">${year}년 서울 아파트 중위가격 ${fmt(seoulMedianAt(year))} · PIR ${seoulPirAt(year).toFixed(1)}배 — 월급을 한 푼도 안 쓰고 ${seoulPirAt(year).toFixed(1)}년을 모아야 살 수 있는 가격, ${pirDifficulty(seoulPirAt(year))}입니다. (KB부동산 발표값 기반 게임용 근사${year > 2025 ? " · 2026년 이후는 가정 구간" : ""})</p>
         <div id="map"></div>
         <p class="tiny muted" id="mapFallback" style="display:none">지도를 불러올 수 없어 목록만 표시합니다.</p>
         <div class="sortbar"><span class="small" style="font-weight:700">정렬</span>
@@ -1389,29 +1690,32 @@
         listEl.innerHTML = sorted.map((a)=>{
           const idx = list.indexOf(a);
           const price = Math.round(aptPriceAt(a,year));
-          const ltv = ltvEff(year, a.region);
-          const loanAmt = Math.round(price*ltv);
-          const need = Math.round(price*1.025) - loanAmt;
-          const afford = ownFunds() >= need;
-          const pmtOk = annualPmtFor(loanAmt, year) <= dsrLimit();
-          const canBuy = afford && pmtOk;
+          const lim = mortgageLimits(price, year);
+          const fMax = mortgageFigures(lim.maxLoan, lim);
+          const need = Math.round(price*1.025) - lim.maxLoan;
+          const afford = buyFunds() >= need;
           const score = (k,v)=>`<div class="score">${k}<div class="bar"><i style="width:${v}%"></i></div></div>`;
           return `<div class="apt" data-idx="${idx}">
             <div class="head"><span class="no">${idx+1}</span><span class="nm">${a.name}</span><span class="price num">${fmt(price)}</span></div>
             <div class="meta">${a.gu} · ${a.built}년 준공 · 전용 84㎡</div>
             <p class="small" style="margin-top:8px">${a.note}</p>
             <div class="scores">${score("학군",a.school)}${score("역세권·교통",a.station)}${score("상품성(연식·브랜드)",a.product)}</div>
-            <div class="fin">필요 자기자본 <b>${fmt(need)}</b> · 대출 <b>${fmt(loanAmt)}</b> (LTV ${Math.round(ltv*100)}%) · 월 상환 약 <b>${fmt(Math.round(loanAmt * ((macro(year).rate+1.4)/100) / (1-Math.pow(1+(macro(year).rate+1.4)/100,-30)) / 12))}</b></div>
-            <button class="btn ${canBuy?"accent":"ghost"} buy" data-buy="${a.id}" ${canBuy?"":"disabled"} type="button">${canBuy?"이 단지로 결정하기":!afford?"자기자본 부족 ("+fmt(need-ownFunds())+" 모자람)":"DSR 40% 초과 — 소득 대비 상환 부담 과다"}</button>
+            <div class="fin">${lim.banned ? `<b style="color:var(--up)">이 시기엔 시가 15억 초과 주택 주담대 금지 (12·16 대책)</b> · ` : ""}대출 가능 최대 <b>${fmt(lim.maxLoan)}</b> (${year}년 규제 · 실효 LTV ${fMax.ltvPct.toFixed(0)}% · ${lim.reg.incomeType || "소득"} 부담 ${fMax.dsrPct.toFixed(0)}%, 금리 연 ${lim.ratePct.toFixed(2)}%) · 한도까지 받으면 필요 자기자본 <b>${fmt(need)}</b> · 월 상환 약 <b>${fmt(fMax.monthly)}</b>${afford ? "" : ` · <b style="color:var(--up)">한도까지 받아도 ${fmt(need-buyFunds())} 부족</b>`}</div>
+            <button class="btn ${afford?"accent":"ghost"} buy" data-buy="${a.id}" type="button">${afford ? "대출 계산하고 결정하기" : "대출 한도 확인하기"}</button>
           </div>`;
         }).join("");
         listEl.querySelectorAll("[data-buy]").forEach(b=>{
           b.onclick = (e)=>{ e.stopPropagation();
-            const apt = aptById(b.dataset.buy); const before = netWorth();
+            const apt = aptById(b.dataset.buy);
             const price = Math.round(aptPriceAt(apt, year));
-            const r = doBuy(apt, price, label);
-            housingResult(st, { lines:[`${apt.name} 전용 84㎡를 ${fmt(price)}에 매수 (${year}년 시세)`, `자기자본 ${fmt(r.need)} + 주택담보대출 ${fmt(r.loanAmt)} (금리 연 ${(macro(year).rate+1.4).toFixed(2)}%, 30년)`, `취득세 등 부대비용 포함 총 ${fmt(r.total)}`, apt.note],
-              source:"국토교통부 실거래가 공개시스템·KB부동산 시세의 단지별 대표 거래가 근사, 금융위원회 LTV 규제 연도별 기준" }, before);
+            renderLoanBuy(st, { apt, price, label: label || "내 집 마련",
+              heading: `${apt.name}, 대출을 얼마나 받을까요?`,
+              sub: buyFunds() >= Math.round(price*1.025)
+                ? "현금만으로도 살 수 있는 집입니다. 그래도 대출을 받으면 현금을 투자 등으로 남겨 둘 수 있습니다 — 레버리지는 집값이 오를 때 수익을 키우고, 내릴 때 손실을 키웁니다."
+                : "현금이 집값에 모자랍니다. 은행 주택담보대출로 부족분을 메우면 살 수 있습니다. 대출 금액은 한도 안에서 직접 정할 수 있습니다.",
+              confirmLabel: "매수 확정하기",
+              source:"국토교통부 실거래가 공개시스템·KB부동산 시세의 단지별 대표 거래가 근사, 한국은행 기준금리, 금융위원회 LTV·DSR 규제 기준",
+              back: ()=> renderMapBuy(st, label) });
           };
         });
         listEl.querySelectorAll(".apt").forEach(el=>{
@@ -1478,23 +1782,15 @@
           if (win){
             const apt = aptById(o.apt);
             const price = Math.round(aptPriceAt(apt, year) * o.disc);
-            const needChk = Math.round(price*1.025) - Math.round(price * ltvEff(year, apt.region));
-            const dsrFail = annualPmtFor(Math.round(price * ltvEff(year, apt.region)), year) > dsrLimit();
-            if (ownFunds() < needChk || dsrFail){
-              app.innerHTML = `<div class="card fade"><div class="kicker">${year}년 · 청약 결과</div><h2>${dsrFail && ownFunds() >= needChk ? "당첨됐지만, DSR에 막힙니다" : "당첨됐지만, 돈이 부족합니다"}</h2>
-                <p>${dsrFail && ownFunds() >= needChk ? `연간 원리금 상환액이 가구소득의 40%(DSR 규제)를 넘어 대출이 나오지 않습니다. 소득을 더 키우거나 가격대를 낮춰야 합니다.` : `${o.name}에 당첨됐지만 필요 자기자본 ${fmt(needChk)}에 가용 자금이 ${fmt(ownFunds())}뿐이라 계약을 포기할 수밖에 없습니다. 청약에서 가장 흔한 비극입니다.`}</p>
-                <div class="choices">
-                  <button class="choice" id="fbBuy2" type="button"><span class="t">매매로 전환 — 지도에서 고르기</span><span class="d">감당 가능한 가격대의 단지를 찾습니다.</span></button>
-                  <button class="choice" id="fbJeonse2" type="button"><span class="t">전세로 기다리기</span><span class="d">종잣돈을 더 모읍니다.</span></button>
-                </div></div>`;
-              scrollTop();
-              document.getElementById("fbBuy2").onclick = ()=> renderMapBuy(st);
-              document.getElementById("fbJeonse2").onclick = ()=>{ housingSnap = snapshotState(); const bf = netWorth(); doJeonse(); housingResult(st, {lines:[`전세보증금 ${fmt(S.jeonse)}으로 거주`], source:"한국부동산원 청약홈"}, bf); };
-              return;
-            }
-            const r = doBuy(apt, price, "청약 당첨");
-            housingResult(st, { lines:[`${o.name} 당첨! (가점 ${pts}점)`, `${apt.name} 분양가 ${fmt(price)} — 같은 단지 시세 ${fmt(Math.round(aptPriceAt(apt,year)))}보다 저렴합니다`, `자기자본 ${fmt(r.need)} + 대출 ${fmt(r.loanAmt)}`],
-              source:"분양가상한제 — 한국부동산원 청약홈, 국토교통부" }, before);
+            // 당첨 확정 후 분양대금 납부: 매매와 같은 주담대 규칙(한도·금리·만기)으로 대출액을 직접 정한다.
+            // 한도까지 받아도 모자라면 대출 화면 안에서 매매 전환·전세 대안을 제시한다
+            renderLoanBuy(st, { apt, price, label:"청약 당첨", priceLabel:"분양가 (전용 84㎡)",
+              heading: `${o.name} 당첨! 분양대금을 어떻게 낼까요?`,
+              sub: `가점 ${pts}점으로 당첨됐습니다. 분양가 ${fmt(price)}는 같은 단지 시세 ${fmt(Math.round(aptPriceAt(apt,year)))}보다 저렴합니다. 현금이 부족하면 주택담보대출로 메울 수 있고, 금액은 직접 정할 수 있습니다.`,
+              confirmLabel: "분양대금 납부하고 입주하기",
+              source:"분양가상한제 — 한국부동산원 청약홈, 국토교통부 · 대출 조건은 한국은행 기준금리 + 금융위원회 LTV·DSR 규제 기준",
+              fallback:"cheongyak",
+              back: ()=>{ if (housingSnap){ const snap = housingSnap; housingSnap = null; restoreState(snap); } renderHousingIntro(st); } });
           } else {
             app.innerHTML = `<div class="card fade"><div class="kicker">${year}년 · 청약 결과</div><h2>아쉽게도 낙첨</h2>
               <p>가점 ${pts}점으로는 커트라인 ${o.cutoff}점에 닿지 못했습니다. 청약은 떨어져도 통장 기간은 계속 쌓입니다. 이제 어떻게 할까요?</p>
@@ -1530,6 +1826,10 @@
       const year = curYear();
       const pension = Math.round((S.salary||0) * 2.0) + (S.pensionBoost||0) + (S.flags.housingPension && S.house ? Math.round(houseValue()*0.18) : 0);
       const hv = houseValue(), ev = extraValue();
+      /* 코호트 회고: 이 세대가 30세였던 해와 60세인 올해의 서울 중위가격·PIR 비교 */
+      const med30 = seoulMedianAt(S.birth + 30), pir30 = seoulPirAt(S.birth + 30);
+      const med60 = seoulMedianAt(year), pir60 = seoulPirAt(year);
+      const medRatio = (med60 / med30).toFixed(1);
       const net = S.cash + S.invest + S.jeonse + hv + ev + pension - totalDebt();
       const pct = percentileOf(net);
       const grade = pct>=95 ? "S · 상위 5%" : pct>=80 ? "A · 상위 20%" : pct>=60 ? "B · 상위 40%" : pct>=40 ? "C · 중위권" : pct>=20 ? "D · 하위권" : "E · 재도전 권장";
@@ -1583,6 +1883,7 @@
           <div class="v num">${fmt(net)}</div>
           <div class="grade">${grade} · 60대 가구 중 상위 ${100-pct}%권</div>
           <p class="small muted" style="margin-top:8px">통계청 가계금융복지조사(2024) 60대 가구 순자산 평균 약 4억 9천만원, 중위 약 3억 1천만원을 은퇴 연도 물가 수준으로 조정한 분포와 비교한 근사 위치입니다. <span id="boardRankNote">아래에서 닉네임을 입력하고 랭크보드에 등록하면 내 순위를 확인할 수 있습니다.</span></p>
+          ${S.loan > 0 ? `<p class="small" style="margin-top:8px"><span class="loan-badge">대출 있음</span> 순자산 = 자산 − 부채로 계산했습니다. 은퇴 시점에 남은 주담대 잔액 <b>${fmt(S.loan)}</b>(연 상환 ${fmt(S.loanPay)}, 남은 만기 ${S.loanYearsLeft}년)이 자산에서 차감된 금액입니다.</p>` : ""}
         </div>
         <div class="bars">${rows.map(r=>`<div class="barow"><span class="lab">${r[0]}</span><span class="track"><span class="fill" style="display:block;width:${Math.max(3, r[1]/maxV*100)}%;background:${r[2]}"></span></span><span class="amt num">${fmt(r[1])}</span></div>`).join("")}
         ${totalDebt()>0?`<div class="barow"><span class="lab">남은 부채</span><span class="track"><span class="fill" style="display:block;width:${Math.max(3,totalDebt()/maxV*100)}%;background:var(--up)"></span></span><span class="amt num">−${fmt(totalDebt())}</span></div>`:""}
@@ -1595,6 +1896,8 @@
           ${S.history.map(h=>`<li><b>${h.age}세</b> ${h.title} — ${h.choice}<span class="statline">${worldStatLine(S.birth + h.age)}</span></li>`).join("")}
           <li><b>60세</b> 은퇴 — ${S.house ? aptById(S.house.aptId).name + "에서 맞이하는 은퇴" : "전세·월세로 맞이하는 은퇴"}<span class="statline">${worldStatLine(year)}</span></li>
         </ul>
+        <p class="small" style="margin-top:16px;text-wrap:pretty"><b>당신의 세대는</b> — 30세였던 ${S.birth + 30}년 서울 아파트 중위가격은 ${fmt(med30)}, PIR ${pir30.toFixed(1)}배(월급을 한 푼도 안 쓰고 ${pir30.toFixed(1)}년)였습니다. 60세가 되는 ${year}년에는 중위가격이 ${fmt(med60)}${year > 2025 ? "(가정)" : ""}로 <b>${medRatio}배</b>가 됐고, PIR은 ${pir60.toFixed(1)}배${year > 2025 ? "(가정)" : ""}입니다. 같은 30년을 살아도, 출발한 해의 이 숫자가 집 사기의 난이도를 갈랐습니다.</p>
+        <span class="src">KB부동산 서울 아파트 중위가격·PIR(3분위 기준) 발표값 기반 게임용 근사${year > 2025 ? " · 2026년 이후 중위가격은 연 2.5% 상승, PIR은 2025년 값 유지로 가정" : ""}</span>
       </div>
       <div class="card fade">
         <h3>랭크보드 <span class="tiny muted" style="font-weight:600">(예시 기록 + 내 결과 · 서버 연동은 추후 확장 예정)</span><span class="board-scroll-hint">가로로 스크롤하여 전체 순위 확인</span></h3>
