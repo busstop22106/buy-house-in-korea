@@ -231,6 +231,17 @@
       .sortbar button:hover{transform:translateY(-1px)}
       .sortbar button:active{transform:scale(.98)}
       .sortbar button.on{background:var(--primary);color:var(--bg);border-color:var(--primary)}
+      .filterbar{display:flex;gap:8px;flex-wrap:wrap;margin:16px 0 0;align-items:center}
+      .filterbar button{border:1px solid var(--line);background:var(--surface);border-radius:8px;
+        height:36px;padding:0 16px;font-size:13px;font-weight:500;color:var(--ink2);transition:var(--ease)}
+      .filterbar button:hover{transform:translateY(-1px)}
+      .filterbar button:active{transform:scale(.98)}
+      .filterbar button.on{background:var(--accent);color:#fff;border-color:var(--accent)}
+      .filterbar select{width:auto;flex:1 1 180px;height:36px;padding:0 12px;font-size:13px}
+      .extra-trade.lotto{background:var(--gold-soft);border-color:var(--gold-line)}
+      .extra-trade.locked{background:var(--surface2)}
+      .lotto-result{margin-top:12px;font-size:15px;font-weight:600;color:var(--ink)}
+      .lotto-result.win{color:var(--gold)}
       .apt-list{display:grid;gap:8px}
       .apt{border:1px solid var(--line);border-radius:var(--radius);padding:24px;background:var(--surface);cursor:pointer;transition:var(--ease)}
       .apt:hover{transform:translateY(-1px)}
@@ -564,52 +575,169 @@
        나머지는 업계 분포 기반 게임용 근사. 연도별로는 대기업 초임의 연도별 흐름 비율로 스케일링한다 */
     const PROF_BASE_2024 = { doctor:40200, dentist:22200, lawyer:10600, accountant:9000, sportStar:30000, proAthlete:9000, sportsCoach:5500, gamerStar:25000, gamerPro:7000, gamerAfter:6000 };
     function profIncome(kind, year){ return PROF_BASE_2024[kind] * bigCorpSalary(year) / bigCorpSalary(2024); }
-    // 아파트 단지: 전용 84㎡ 대표 거래가 앵커(만원) — 국토부 실거래가·KB시세 근사
+    // 아파트 단지 50곳: 전용 84㎡ 대표 거래가 앵커(만원, 없는 단지는 area에 표기한 가까운 평형 기준) — 국토교통부 실거래가·KB부동산 시세 근사, 세대수·좌표는 공개 자료 기준 게임용 근사
     const APTS = [
-      {id:"eunma", name:"은마아파트", gu:"서울 강남구 대치동", region:"서울", built:1979, lat:37.4983, lng:127.0656,
+      {id:"eunma", name:"은마아파트", gu:"서울 강남구 대치동", region:"서울", built:1979, lat:37.4983, lng:127.0656, units:4424,
        anchors:[[2003,48000],[2006,95000],[2010,90000],[2015,108000],[2020,205000],[2025,268000]], growth:0.040,
        school:98, station:88, product:52, note:"대치 학원가 한복판. 낡았지만 재건축 기대와 학군이 가격을 떠받치는 상징적 단지."},
-      {id:"raemian-firstige", name:"래미안퍼스티지", gu:"서울 서초구 반포동", region:"서울", built:2009, lat:37.5048, lng:127.0038,
+      {id:"raemian-firstige", name:"래미안퍼스티지", gu:"서울 서초구 반포동", region:"서울", built:2009, lat:37.5048, lng:127.0038, units:2444,
        anchors:[[2010,148000],[2015,163000],[2020,298000],[2025,425000]], growth:0.043,
        school:92, station:90, product:93, note:"반포 한강변 대장주. 신축급 상품성과 한강 조망, 고속터미널 생활권."},
-      {id:"jamsil-els", name:"잠실엘스", gu:"서울 송파구 잠실동", region:"서울", built:2008, lat:37.5186, lng:127.0859,
+      {id:"jamsil-els", name:"잠실엘스", gu:"서울 송파구 잠실동", region:"서울", built:2008, lat:37.5186, lng:127.0859, units:5678,
        anchors:[[2010,97000],[2015,110000],[2020,196000],[2025,252000]], growth:0.038,
        school:85, station:90, product:86, note:"잠실역·롯데월드 생활권 대단지. 강남 접근성과 실거주 만족도가 높다."},
-      {id:"yeouido-sibeom", name:"시범아파트", gu:"서울 영등포구 여의도동", region:"서울", built:1971, lat:37.5228, lng:126.9267,
+      {id:"yeouido-sibeom", name:"시범아파트", gu:"서울 영등포구 여의도동", region:"서울", built:1971, lat:37.5228, lng:126.9267, units:1584,
        anchors:[[2010,94000],[2015,103000],[2020,182000],[2025,228000]], growth:0.036,
        school:70, station:86, product:44, note:"여의도 금융가 직주근접. 재건축 사업 속도가 가격의 변수."},
-      {id:"mapo-raemian", name:"마포래미안푸르지오", gu:"서울 마포구 아현동", region:"서울", built:2014, lat:37.5503, lng:126.9577,
+      {id:"mapo-raemian", name:"마포래미안푸르지오", gu:"서울 마포구 아현동", region:"서울", built:2014, lat:37.5503, lng:126.9577, units:3885,
        anchors:[[2015,77000],[2020,146000],[2025,183000]], growth:0.035,
        school:72, station:93, product:88, note:"공덕역 쿼드러플 역세권. 광화문·여의도·강남 모두 닿는 교통 요지."},
-      {id:"oksu-riverzen", name:"래미안옥수리버젠", gu:"서울 성동구 옥수동", region:"서울", built:2012, lat:37.5415, lng:127.0175,
+      {id:"oksu-riverzen", name:"래미안옥수리버젠", gu:"서울 성동구 옥수동", region:"서울", built:2012, lat:37.5415, lng:127.0175, units:1821,
        anchors:[[2015,81000],[2020,153000],[2025,192000]], growth:0.035,
        school:68, station:91, product:86, note:"금호·옥수 한강변. 강남까지 15분, 상대적으로 덜 알려진 강북의 강자."},
-      {id:"godeok-gracium", name:"고덕그라시움", gu:"서울 강동구 고덕동", region:"서울", built:2019, lat:37.5583, lng:127.1553,
+      {id:"godeok-gracium", name:"고덕그라시움", gu:"서울 강동구 고덕동", region:"서울", built:2019, lat:37.5583, lng:127.1553, units:4932,
        anchors:[[2017,83000],[2020,117000],[2025,141000]], growth:0.028,
        school:78, station:74, product:95, note:"고덕 신축 대단지. 새 아파트 상품성은 최고, 도심까지는 거리가 있다."},
-      {id:"sanggye-jugong", name:"상계주공5단지", gu:"서울 노원구 상계동", region:"서울", built:1988, lat:37.6607, lng:127.0722,
+      {id:"sanggye-jugong", name:"상계주공5단지", gu:"서울 노원구 상계동", region:"서울", built:1988, lat:37.6607, lng:127.0722, units:640,
        anchors:[[2005,20500],[2010,26500],[2015,29000],[2020,61000],[2025,67000]], growth:0.020,
        school:76, station:70, product:48, note:"중계동 학원가 배후. 서울에서 손꼽히게 진입장벽이 낮은 구축."},
-      {id:"bundang-parkview", name:"파크뷰", gu:"경기 성남시 분당구 정자동", region:"경기", built:2004, lat:37.3680, lng:127.1085,
+      {id:"bundang-parkview", name:"파크뷰", gu:"경기 성남시 분당구 정자동", region:"경기", built:2004, lat:37.3680, lng:127.1085, units:1829,
        anchors:[[2005,57000],[2010,67000],[2015,75000],[2020,140000],[2025,170000]], growth:0.033,
        school:90, station:86, product:80, note:"분당의 대장. 정자 카페거리와 탄천, 판교·강남 출퇴근 수요가 탄탄하다."},
-      {id:"gwacheon-sur", name:"래미안슈르", gu:"경기 과천시 별양동", region:"경기", built:2008, lat:37.4281, lng:126.9881,
+      {id:"gwacheon-sur", name:"래미안슈르", gu:"경기 과천시 별양동", region:"경기", built:2008, lat:37.4281, lng:126.9881, units:3145,
        anchors:[[2010,71000],[2015,77000],[2020,133000],[2025,166000]], growth:0.032,
        school:88, station:80, product:78, note:"준강남으로 불리는 과천. 정부청사역 역세권과 쾌적한 주거환경."},
-      {id:"gwanggyo-sclass", name:"광교중흥S클래스", gu:"경기 수원시 영통구 광교", region:"경기", built:2016, lat:37.2877, lng:127.0520,
+      {id:"gwanggyo-sclass", name:"광교중흥S클래스", gu:"경기 수원시 영통구 광교", region:"경기", built:2016, lat:37.2877, lng:127.0520, units:2231,
        anchors:[[2016,67000],[2020,106000],[2025,126000]], growth:0.028,
        school:80, station:72, product:91, note:"광교호수공원 신축. 수원·용인 수요의 중심, 서울 출퇴근은 각오가 필요하다."},
-      {id:"ilsan-gangseon", name:"강선마을7단지", gu:"경기 고양시 일산서구 주엽동", region:"경기", built:1994, lat:37.6697, lng:126.7620,
+      {id:"ilsan-gangseon", name:"강선마을7단지", gu:"경기 고양시 일산서구 주엽동", region:"경기", built:1994, lat:37.6697, lng:126.7620, units:986,
        anchors:[[2005,28500],[2010,32500],[2015,34500],[2020,57000],[2025,61000]], growth:0.018,
        school:82, station:64, product:54, note:"일산 학원가와 호수공원. 가격 부담이 가장 낮지만 상승 탄력은 약했다."},
-      {id:"songdo-firstworld", name:"더샵퍼스트월드", gu:"인천 연수구 송도동", region:"인천", built:2009, lat:37.3833, lng:126.6560,
+      {id:"songdo-firstworld", name:"더샵퍼스트월드", gu:"인천 연수구 송도동", region:"인천", built:2009, lat:37.3833, lng:126.6560, units:610,
        anchors:[[2010,41500],[2015,42500],[2020,75000],[2025,87000]], growth:0.024,
-       school:76, station:58, product:83, note:"송도 국제도시 1세대 주상복합. 국제학교·바이오 기업 수요가 관건."}
+       school:76, station:58, product:83, note:"송도 국제도시 1세대 주상복합. 국제학교·바이오 기업 수요가 관건."},
+      {id:"helio-city", name:"헬리오시티", gu:"서울 송파구 가락동", region:"서울", built:2018, lat:37.4982, lng:127.1185, units:9510,
+       anchors:[[2018,124700],[2020,172000],[2025,215000]], growth:0.04,
+       school:88, station:84, product:92, note:"가락시장역·위례신사선 생활권에 헬리오시티 9,510세대 매머드 단지. 송파 대단지의 기준점."},
+      {id:"olympicpark-foreon", name:"올림픽파크포레온", gu:"서울 강동구 둔촌동", region:"서울", built:2024, lat:37.5215, lng:127.1305, units:12032,
+       anchors:[[2023,154000],[2025,280000]], growth:0.04,
+       school:84, station:88, product:96, note:"둔촌주공을 재건축한 국내 최대 12,032세대 단지. 올림픽공원이 앞마당이고 입주와 함께 강동 대장주로 올라섰다."},
+      {id:"jamsil-ricenz", name:"잠실리센츠", gu:"서울 송파구 잠실동", region:"서울", built:2008, lat:37.517, lng:127.087, units:5563,
+       anchors:[[2010,96000],[2015,112800],[2020,187200],[2025,240000]], growth:0.04,
+       school:86, station:92, product:84, note:"잠실 재건축 3대장 중 하나. 잠실역·한강·롯데월드 생활권을 모두 누리는 대단지."},
+      {id:"acro-riverheim", name:"아크로리버하임", gu:"서울 동작구 흑석동", region:"서울", built:2019, lat:37.5085, lng:126.962, units:1073,
+       anchors:[[2019,117800],[2025,190000]], growth:0.036,
+       school:74, station:82, product:94, note:"흑석뉴타운의 대장주 신축. 한강 조망과 중앙대·노량진 생활권, 여의도 접근성이 강점."},
+      {id:"raemian-parksuite", name:"래미안파크스위트", gu:"서울 광진구 구의동", region:"서울", built:2018, lat:37.541, lng:127.085, units:854,
+       anchors:[[2018,88200],[2020,121600],[2025,152000]], growth:0.036,
+       school:76, station:80, product:90, note:"구의·자양 생활권의 신축. 강변역·테크노마트와 한강이 가깝고 광진구에서 상품성이 가장 좋다."},
+      {id:"dmc-raemian-e", name:"DMC래미안e편한세상", gu:"서울 은평구 수색동", region:"서울", built:2012, lat:37.581, lng:126.897, units:1675,
+       anchors:[[2012,54000],[2020,84200],[2025,108000]], growth:0.028,
+       school:70, station:84, product:80, note:"수색·DMC역 생활권 대단지. 상암 미디어시티 직주근접 수요가 꾸준한 은평의 대표 단지."},
+      {id:"dmc-parkview-xi", name:"DMC파크뷰자이", gu:"서울 서대문구 남가좌동", region:"서울", built:2015, lat:37.572, lng:126.92, units:4300,
+       anchors:[[2015,76600],[2020,105600],[2025,132000]], growth:0.032,
+       school:72, station:78, product:86, note:"가재울뉴타운 4,300세대 대단지. 경의선 가좌역과 상암·홍대 접근성으로 실수요가 탄탄하다."},
+      {id:"hangang-mansion", name:"한강맨션", gu:"서울 용산구 이촌동", region:"서울", built:1971, lat:37.517, lng:126.973, units:660, area:"전용 87㎡",
+       anchors:[[2005,76500],[2010,102000],[2015,119800],[2020,198900],[2025,255000]], growth:0.04,
+       school:78, station:84, product:46, note:"동부이촌동의 상징. 한강 조망과 재건축 기대가 낡은 연식을 압도하는 용산의 노른자."},
+      {id:"seoul-stn-central-xi", name:"서울역센트럴자이", gu:"서울 중구 만리동", region:"서울", built:2017, lat:37.553, lng:126.965, units:1152,
+       anchors:[[2017,97400],[2020,134400],[2025,168000]], growth:0.036,
+       school:68, station:95, product:88, note:"서울역 도보권 신축. KTX·공항철도·4개 노선이 겹치는 도심 최중심 입지."},
+      {id:"raemian-gilum-centerpiece", name:"래미안길음센터피스", gu:"서울 성북구 길음동", region:"서울", built:2019, lat:37.605, lng:127.022, units:2352,
+       anchors:[[2019,77500],[2025,125000]], growth:0.032,
+       school:74, station:76, product:92, note:"길음뉴타운의 대장 신축. 미아사거리역과 뉴타운 인프라가 완성된 성북 대표 단지."},
+      {id:"gwannak-prugio", name:"관악푸르지오", gu:"서울 관악구 봉천동", region:"서울", built:2004, lat:37.481, lng:126.958, units:2104,
+       anchors:[[2005,30600],[2010,40800],[2015,47900],[2020,79600],[2025,102000]], growth:0.028,
+       school:66, station:80, product:72, note:"서울대입구역 생활권 대단지. 서울대·관악 수요가 받쳐 주는 관악구의 기준 단지."},
+      {id:"magok-hillstate-master", name:"마곡13단지힐스테이트마스터", gu:"서울 강서구 마곡동", region:"서울", built:2017, lat:37.559, lng:126.825, units:1194,
+       anchors:[[2017,76000],[2020,104800],[2025,131000]], growth:0.032,
+       school:78, station:82, product:90, note:"마곡지구 대기업 연구단지 배후의 신축. 서울식물원과 9호선 생활권이 강점."},
+      {id:"raemian-weave", name:"래미안위브", gu:"서울 동대문구 답십리동", region:"서울", built:2014, lat:37.566, lng:127.052, units:2652,
+       anchors:[[2014,66500],[2020,103700],[2025,133000]], growth:0.032,
+       school:70, station:84, product:84, note:"답십리뉴타운 2,652세대 대단지. 왕십리·청량리 더블 생활권으로 도심 접근성이 좋다."},
+      {id:"pangyo-prugio-grangble", name:"판교푸르지오그랑블", gu:"경기 성남시 분당구 백현동", region:"경기", built:2011, lat:37.386, lng:127.115, units:2116, area:"전용 97㎡",
+       anchors:[[2011,122500],[2020,191100],[2025,245000]], growth:0.04,
+       school:94, station:88, product:82, note:"판교의 대장주. 판교역·현대백화점·테크노밸리를 모두 끼고 있는 백현동 핵심 단지."},
+      {id:"wirye-central-xi", name:"위례센트럴자이", gu:"경기 성남시 수정구 창곡동", region:"경기", built:2017, lat:37.472, lng:127.143, units:1413,
+       anchors:[[2017,98600],[2020,136000],[2025,170000]], growth:0.036,
+       school:82, station:70, product:90, note:"위례신도시의 대장주. 위례중앙광장 상권과 트램·위례신사선 호재가 가격을 떠받친다."},
+      {id:"sibeom-hanyang", name:"시범단지 한양아파트", gu:"경기 성남시 분당구 서현동", region:"경기", built:1991, lat:37.381, lng:127.128, units:2419,
+       anchors:[[2005,54000],[2010,72000],[2015,84600],[2020,140400],[2025,180000]], growth:0.036,
+       school:92, station:86, product:50, note:"1기 신도시를 대표하는 2,419세대 대단지. 서현역과 중앙공원을 끼고, 재건축 선도지구 기대감이 가격을 이끈다."},
+      {id:"gwacheon-prugio-summit", name:"과천 푸르지오써밋", gu:"경기 과천시 중앙동", region:"경기", built:2020, lat:37.425, lng:126.989, units:1571,
+       anchors:[[2020,155000],[2025,250000]], growth:0.04,
+       school:90, station:84, product:95, note:"과천주공1단지를 재건축한 과천의 대장주 신축. 경기도에서 처음 국민평형 25억 시대를 연 단지."},
+      {id:"dongtan-lottecastle", name:"동탄역 롯데캐슬", gu:"경기 화성시 오산동", region:"경기", built:2021, lat:37.201, lng:127.095, units:940,
+       anchors:[[2021,100400],[2025,162000]], growth:0.036,
+       school:80, station:90, product:93, note:"동탄역과 이어지는 초역세권 주상복합. GTX-A·SRT 동탄역 개통으로 동탄2의 대장주가 됐다."},
+      {id:"maegyo-prugio-skview", name:"매교역푸르지오SK뷰", gu:"경기 수원시 팔달구 매교동", region:"경기", built:2022, lat:37.266, lng:127.014, units:3603,
+       anchors:[[2022,53300],[2025,86000]], growth:0.028,
+       school:76, station:84, product:92, note:"수원 원도심 재개발 대단지 3,603세대. 수인분당선 매교역 역세권에 행궁동 생활권이 가깝다."},
+      {id:"ilsan-wicity-xi", name:"위시티자이", gu:"경기 고양시 일산동구 식사동", region:"경기", built:2010, lat:37.679, lng:126.813, units:4683,
+       anchors:[[2010,25600],[2015,30100],[2020,49900],[2025,64000]], growth:0.022,
+       school:84, station:62, product:74, note:"일산동구 식사동 4,683세대 매머드 단지. 일산 학원 수요의 한 축이지만 상승 탄력은 약했다."},
+      {id:"gwangmyeong-stn-park-xi", name:"광명역파크자이", gu:"경기 광명시 일직동", region:"경기", built:2017, lat:37.418, lng:126.883, units:1211,
+       anchors:[[2017,63800],[2020,88000],[2025,110000]], growth:0.028,
+       school:74, station:86, product:88, note:"KTX 광명역 역세권 신축. 코스트코·이케아 생활권과 여의도 출퇴근 수요가 받쳐 준다."},
+      {id:"pyeongchon-thesharp-central", name:"평촌더샵센트럴시티", gu:"경기 안양시 동안구 호계동", region:"경기", built:2016, lat:37.375, lng:126.955, units:1459,
+       anchors:[[2016,55100],[2020,76000],[2025,95000]], growth:0.028,
+       school:86, station:80, product:88, note:"평촌 학원가 배후의 신축 대단지. 범계역 상권과 평촌 학군 수요가 꾸준하다."},
+      {id:"seongbok-lottecastle-goldtown", name:"성복역롯데캐슬골드타운", gu:"경기 용인시 수지구 성복동", region:"경기", built:2019, lat:37.313, lng:127.079, units:2356,
+       anchors:[[2019,75000],[2025,121000]], growth:0.032,
+       school:84, station:82, product:92, note:"성복역 초역세권 신축. 신분당선으로 판교·강남 접근성이 좋은 수지의 대장주."},
+      {id:"misa-central-xi", name:"미사강변센트럴자이", gu:"경기 하남시 망월동", region:"경기", built:2017, lat:37.575, lng:127.19, units:1222,
+       anchors:[[2017,66100],[2020,91200],[2025,114000]], growth:0.028,
+       school:80, station:78, product:90, note:"미사강변도시 중심 상권 신축. 5호선 미사역과 한강·미사호수공원이 가까운 하남 대표 단지."},
+      {id:"dasan-xi-ivyplace", name:"다산자이아이비플레이스", gu:"경기 남양주시 다산동", region:"경기", built:2021, lat:37.622, lng:127.148, units:967,
+       anchors:[[2021,50200],[2025,81000]], growth:0.028,
+       school:78, station:74, product:92, note:"다산신도시 지금지구의 신축. 경의중앙선 도농역 생활권에 왕숙신도시 호재가 겹친다."},
+      {id:"gimpo-hangang-metro-xi", name:"한강메트로자이", gu:"경기 김포시 걸포동", region:"경기", built:2020, lat:37.631, lng:126.708, units:4229,
+       anchors:[[2020,40900],[2025,66000]], growth:0.022,
+       school:76, station:80, product:90, note:"김포골드라인 걸포북변역 역세권 4,229세대 대단지. 김포에서 상품성과 규모가 가장 크다."},
+      {id:"unjeong-central-prugio", name:"운정신도시센트럴푸르지오", gu:"경기 파주시 목동동", region:"경기", built:2018, lat:37.716, lng:126.747, units:1956,
+       anchors:[[2018,34200],[2020,47200],[2025,59000]], growth:0.022,
+       school:80, station:72, product:88, note:"운정신도시 중심의 대단지. GTX-A 운정중앙역 개통으로 서울 접근성이 크게 좋아졌다."},
+      {id:"baegot-halla-vivaldi", name:"시흥배곧한라비발디캠퍼스", gu:"경기 시흥시 정왕동", region:"경기", built:2018, lat:37.379, lng:126.734, units:2701,
+       anchors:[[2018,35400],[2020,48800],[2025,61000]], growth:0.022,
+       school:78, station:66, product:86, note:"배곧신도시 2,701세대 대단지. 서울대 시흥캠퍼스 배후에 오이도·월곶 생활권이 가깝다."},
+      {id:"ansan-grancity-xi", name:"그랑시티자이", gu:"경기 안산시 상록구 사동", region:"경기", built:2020, lat:37.309, lng:126.857, units:4283,
+       anchors:[[2020,52100],[2025,84000]], growth:0.028,
+       school:80, station:78, product:92, note:"안산 최대 4,283세대 신축 대단지. 호수공원과 신안산선 호수역 호재가 있는 안산의 대장주."},
+      {id:"jungdong-centralpark-prugio", name:"중동센트럴파크푸르지오", gu:"경기 부천시 원미구 중동", region:"경기", built:2020, lat:37.502, lng:126.775, units:999,
+       anchors:[[2020,57000],[2025,92000]], growth:0.028,
+       school:78, station:86, product:90, note:"부천 중동신도시 중심의 신축. 7호선 부천시청역과 현대백화점 생활권을 누린다."},
+      {id:"songdo-firstpark", name:"송도더샵퍼스트파크", gu:"인천 연수구 송도동", region:"인천", built:2017, lat:37.389, lng:126.644, units:2681,
+       anchors:[[2017,55700],[2020,76800],[2025,96000]], growth:0.028,
+       school:80, station:64, product:90, note:"송도 1공구 신축 대단지. 센트럴파크와 국제업무지구가 가까운 송도 대표 주거 단지."},
+      {id:"cheongna-xi", name:"청라자이", gu:"인천 서구 청라동", region:"인천", built:2012, lat:37.536, lng:126.633, units:884,
+       anchors:[[2012,33500],[2020,52300],[2025,67000]], growth:0.022,
+       school:76, station:62, product:78, note:"청라국제도시 초기 대단지. 청라호수공원 생활권에 7호선 연장 호재가 진행 중이다."},
+      {id:"raemian-bupyeong", name:"래미안부평", gu:"인천 부평구 부평동", region:"인천", built:2014, lat:37.493, lng:126.723, units:1381,
+       anchors:[[2014,32000],[2020,49900],[2025,64000]], growth:0.022,
+       school:74, station:82, product:82, note:"부평역 생활권 대단지. 인천 지하철과 경인선, 부평 상권이 받쳐 주는 부평 대표 단지."},
+      {id:"ecometro-hanwha", name:"에코메트로한화꿈에그린", gu:"인천 남동구 논현동", region:"인천", built:2010, lat:37.403, lng:126.724, units:4226,
+       anchors:[[2010,21600],[2015,25400],[2020,42100],[2025,54000]], growth:0.022,
+       school:78, station:72, product:76, note:"소래포구·논현동 4,226세대 대단지. 수인분당선 소래포구역 생활권의 인천 남부 기준 단지."},
+      {id:"incheon-sk-skyview", name:"인천SK스카이뷰", gu:"인천 미추홀구 용현동", region:"인천", built:2016, lat:37.452, lng:126.654, units:3971,
+       anchors:[[2016,34200],[2020,47200],[2025,59000]], growth:0.022,
+       school:76, station:70, product:88, note:"용현·학익지구 3,971세대 대단지. 수인분당선 인하대역과 송도 접근성이 강점."},
+      {id:"gyeyang-centreville", name:"계양센트레빌", gu:"인천 계양구 작전동", region:"인천", built:2011, lat:37.529, lng:126.727, units:1753,
+       anchors:[[2011,26500],[2020,41300],[2025,53000]], growth:0.022,
+       school:74, station:74, product:76, note:"작전역 생활권 대단지. 인천 1호선으로 부평·계양을 오가는 실수요가 꾸준하다."},
+      {id:"geomdan-prugio-thevenue", name:"검단신도시푸르지오더베뉴", gu:"인천 서구 원당동", region:"인천", built:2021, lat:37.601, lng:126.685, units:1540,
+       anchors:[[2021,38400],[2025,62000]], growth:0.022,
+       school:78, station:76, product:92, note:"검단신도시 1단계 신축. 인천 1호선 검단 연장 개통으로 교통이 좋아진 검단 대표 단지."}
     ];
-    APTS.forEach(a=>{ a.availableFrom = a.anchors[0][0]; });
     function aptPriceAt(apt, year){
       const A=apt.anchors;
-      if (year<=A[0][0]) return A[0][1]*Math.pow(1.045, year-A[0][0]);
+      if (year<=A[0][0]){
+        // 첫 앵커보다 앞선 해는 연 4.5% 단일 역산으로 뭉개지 않고, 서울 아파트 중위가격(서울 전체 시장의
+        // 실제 흐름 — 외환위기 하락·2000년대 상승·2010년대 초반 정체 포함)의 같은 기간 변동 비율로 되돌린다.
+        // 단지 가격 수준은 첫 앵커값을 그대로 두고, "언제 얼마나 올랐는가"만 시장 흐름을 따르게 하는 보정이다.
+        const base = seoulMedianAt(A[0][0]);
+        if (base > 0) return A[0][1] * seoulMedianAt(year) / base;
+        return A[0][1]*Math.pow(1.045, year-A[0][0]);
+      }
       for (let i=1;i<A.length;i++){
         if (year<=A[i][0]){ const [x0,y0]=A[i-1],[x1,y1]=A[i];
           return Math.exp(Math.log(y0)+(Math.log(y1)-Math.log(y0))*(year-x0)/(x1-x0)); }
@@ -716,6 +844,7 @@
     function hideExitModal(){ exitModal.classList.add("hidden"); }
     function exitGame(){
       hideExitModal();
+      destroyActiveMap(); // 지도 화면에서 바로 종료해도 지도 인스턴스가 남지 않게
       S = null;
       housingSnap = null;
       renderStart();
@@ -1039,7 +1168,7 @@
         showPillLabelEl.textContent = apt ? "꿈의 아파트 · 이 게임에서 살 수 있어요" : "꿈의 아파트 · 쇼케이스";
         showNameEl.textContent = dName;
         /* 전용 84㎡가 없는 단지는 area 필드의 면적 기준으로 라벨을 바꾼다 */
-        const dArea = s.area || "전용 84㎡";
+        const dArea = (apt && apt.area) || s.area || "전용 84㎡";
         showGuEl.textContent = dGu + " · " + dBuilt + "년 준공 · " + dArea;
         showPriceLabEl.textContent = "2025년 시세 · " + dArea;
         showPriceEl.textContent = dPrice;
@@ -1190,7 +1319,7 @@
         salary:0, job:null, saveRate:0.34, allocInv:0, speculative:false, invProduct:null,
         house:null, loan:0, loanRate:0, loanPay:0, loanTerm:0, loanYearsLeft:0, loanStartYear:0, extraProp:null,
         married:false, kids:0, tongjangStart:null, edu:null, eduSpendUntil:0, childCostUntil:0, sideIncome:0, sideIncomeUntil:0,
-        flags:{}, history:[], shocksShown:{}, settleLog:[], lastYear:birth+13 };
+        flags:{}, history:[], shocksShown:{}, settleLog:[], lottoLog:[], lastYear:birth+13 };
       hud.classList.remove("hidden");
       armExitGuard();
       updateHUD();
@@ -1355,7 +1484,8 @@
           ...(S.flags.proGamer ? [
           { t:"프로팀 주전 경쟁 — 시즌 소화", d:"데뷔한 프로팀에서 시즌을 뛰며 연봉·상금을 법니다. 학점·스펙은 쌓기 어렵지만 커리어 수입이 시작됩니다.", tag:"프로 활동",
             apply(){ const pay = S.flags.proGamer === "star" ? 4000 : 1500; S.cash += pay;
-              return { lines:[`프로 활동 수입 ${fmt(pay)} 확보 (연봉·상금·방송 수입 합산 근사)`, "23·25세에도 프로 활동 선택지가 이어지고, 26세에 정식 커리어로 연결됩니다"], source:"프로게이머 연봉·상금 분포 참고 (게임용 근사)" }; } },
+              S.salary = Math.round(profIncome(S.flags.proGamer === "star" ? "gamerStar" : "gamerPro", curYear()));
+              return { lines:[`프로 활동 수입 ${fmt(pay)} 확보 (연봉·상금·방송 수입 합산 근사)`, `프로 활동 연 소득 ${fmt(S.salary)}이 연봉으로도 잡힙니다 — 소득이 생겼으니 집 사고팔기(지도)도 이때부터 열립니다`, "23·25세에도 프로 활동 선택지가 이어지고, 26세에 정식 커리어로 연결됩니다"], source:"프로게이머 연봉·상금 분포 참고 (게임용 근사)" }; } },
           ] : []),
         ]},
       { age:23, title:"대학 후반, 스펙의 갈림길", kicker:"23세 · 취업 준비",
@@ -1396,7 +1526,8 @@
           ...(S.flags.proGamer ? [
           { t:"프로 커리어 — 전성기 시즌", d:"20대 초반은 프로게이머의 전성기. 재계약과 대회 상금으로 커리어 수입이 가장 큰 구간입니다.", tag:"프로 활동",
             apply(){ const pay = S.flags.proGamer === "star" ? 6000 : 2200; S.cash += pay;
-              return { lines:[`프로 활동 수입 ${fmt(pay)} 확보 (연봉·상금 합산 근사)`, "25세에도 프로 활동이 이어지고, 26세 정식 커리어로 연결됩니다"], source:"프로게이머 연봉·상금 분포 참고 (게임용 근사)" }; } },
+              S.salary = Math.round(profIncome(S.flags.proGamer === "star" ? "gamerStar" : "gamerPro", curYear()));
+              return { lines:[`프로 활동 수입 ${fmt(pay)} 확보 (연봉·상금 합산 근사)`, `프로 활동 연 소득 ${fmt(S.salary)} 반영 — 집 사고팔기(지도)가 열린 상태가 유지됩니다`, "25세에도 프로 활동이 이어지고, 26세 정식 커리어로 연결됩니다"], source:"프로게이머 연봉·상금 분포 참고 (게임용 근사)" }; } },
           ] : []),
         ]},
       { age:25, title:"취업 준비, 어느 문을 두드릴까", kicker:"25세 · 취업 준비",
@@ -1417,7 +1548,8 @@
           ...(S.flags.proGamer ? [
           { t:"프로 커리어 — 마지막 전성기 계약", d:"은퇴가 가까워지는 나이. 대형 계약과 상금으로 선수 생활 수입을 마무리합니다.", tag:"프로 활동",
             apply(){ const pay = S.flags.proGamer === "star" ? 7000 : 2600; S.cash += pay;
-              return { lines:[`프로 활동 수입 ${fmt(pay)} 확보 (연봉·상금 합산 근사)`, "26세 첫 직장 단계에서 프로게이머 커리어가 정식 연봉으로 이어집니다"], source:"프로게이머 연봉·상금 분포 참고 (게임용 근사)" }; } },
+              S.salary = Math.round(profIncome(S.flags.proGamer === "star" ? "gamerStar" : "gamerPro", curYear()));
+              return { lines:[`프로 활동 수입 ${fmt(pay)} 확보 (연봉·상금 합산 근사)`, `프로 활동 연 소득 ${fmt(S.salary)} 반영 — 집 사고팔기(지도)가 열린 상태가 유지됩니다`, "26세 첫 직장 단계에서 프로게이머 커리어가 정식 연봉으로 이어집니다"], source:"프로게이머 연봉·상금 분포 참고 (게임용 근사)" }; } },
           ] : []),
         ]},
       { age:26, title:"첫 직장", kicker:"26세 · 사회초년생",
@@ -1736,13 +1868,87 @@
       });
     }
 
+    /* ---------- 추가 행동: 로또 사기 (19세 단계부터, 단계마다 1장) ----------
+       복권 및 복권기금법상 만 19세 미만은 복권을 살 수 없다. 이 게임은 생일을 따로 계산하지 않아
+       연 나이 기준 19세 단계부터 살 수 있게 단순화했다 — 실제 만 나이로는 19세 단계 초반에 아직
+       만 19세가 안 됐을 수 있다는 뜻이며, 이 단순화는 로또 박스 안내 문구에도 그대로 적어 둔다.
+       확률 0.01%·상금 20억원은 게임용 단순화 (실제 로또 1등 확률은 814만분의 1 수준, 당첨금은 회차별 10~30억원대).
+       구매 이력은 S.flags.lottoHistory 배열에 턴마다 쌓아 과거 기록이 덮어써지지 않게 하고,
+       결과 줄은 정산 로그와 별개인 S.lottoLog에 남긴다 — 당첨 줄은 advance()가 settleLog를 교체해도
+       사라지지 않고, 꽝 줄도 그 단계의 정산 로그 영역에 한 줄 남는다 (상단 로그와 박스의 중복 표출 방지) */
+    const LOTTO_COST = 0.1; // 1,000원 (게임 화폐 단위 만원)
+    const LOTTO_PRIZE = 200000; // 20억원 (만원)
+    const LOTTO_ODDS = 0.0001; // 0.01%
+    function lottoEntry(){
+      if (Array.isArray(S.flags.lottoHistory)){
+        return S.flags.lottoHistory.find(e => e.stage === S.stageIdx) || null;
+      }
+      // 예전 단일 객체 기록이 남아 있으면 이력 배열로 옮겨서 읽는다
+      if (S.flags.lotto && typeof S.flags.lotto.stage === "number"){
+        S.flags.lottoHistory = [{ stage:S.flags.lotto.stage, win:!!S.flags.lotto.win }];
+        delete S.flags.lotto;
+        return S.flags.lottoHistory[0].stage === S.stageIdx ? S.flags.lottoHistory[0] : null;
+      }
+      return null;
+    }
+    function lottoBought(){ return !!lottoEntry(); }
+    /* 정산 로그 표시용 합본: 이번 단계 정산(settleLog)에 로또 결과를 겹치지 않게 붙인다.
+       꽝 줄은 산 단계에서만 보이고, 당첨 줄은 이후 단계에서도 계속 보인다 */
+    function combinedSettleLines(){
+      const lotto = (Array.isArray(S.lottoLog) ? S.lottoLog : []).filter(e => e.stage === S.stageIdx || e.win);
+      return S.settleLog.concat(lotto.map(e => ({ cls:e.cls, text:e.text })));
+    }
+    function settleLogHTML(){
+      const lines = combinedSettleLines();
+      return lines.length ? `<div class="log"><ul>${lines.map(l=>`<li class="${l.cls}"><span class="dot"></span><span class="log-main"><span>${l.text}</span>${l.stat?`<span class="statline">${l.stat}</span>`:""}</span></li>`).join("")}</ul></div>` : "";
+    }
+    function lottoBoxHTML(){
+      if (S.age < 19) return "";
+      const entry = lottoEntry();
+      const canAfford = (S.cash || 0) >= LOTTO_COST;
+      const body = entry
+        ? (entry.win
+          ? `<p class="lotto-result win">1등 당첨! 상금 ${fmt(LOTTO_PRIZE)}이 현금에 더해졌습니다. 이번 단계에서는 이미 구매했습니다 (단계마다 1장).</p>`
+          : `<p class="lotto-result">꽝 — 이번 장은 당첨되지 않았습니다. 이번 단계에서는 이미 구매했습니다 (단계마다 1장).</p>`)
+        : `<p class="small muted" style="margin-top:4px">1장 1,000원, 이 단계에서 1장까지만 살 수 있습니다. 1등 확률 0.01%, 당첨 시 상금 ${fmt(LOTTO_PRIZE)}을 현금으로 바로 받습니다. 실제 로또 1등 당첨금은 회차마다 달라 보통 10억~30억원대입니다. 원래 만 19세 미만은 복권을 살 수 없는데(복권 및 복권기금법), 이 게임은 생일을 따로 계산하지 않아 19세 단계부터 살 수 있게 단순화했습니다.</p>
+          ${canAfford
+            ? `<button class="btn ghost" id="btnLotto" type="button" style="width:100%;margin-top:12px">로또 1장 사기 (1,000원)</button>`
+            : `<button class="btn ghost" id="btnLotto" type="button" style="width:100%;margin-top:12px" disabled>로또 1장 사기 (1,000원)</button>
+               <p class="small" style="margin-top:8px;color:var(--up);font-weight:600">현금이 1,000원보다 적어 지금은 로또를 살 수 없습니다.</p>`}`;
+      return `<div class="extra-trade lotto">
+          <div class="extra-trade-head"><span class="t">로또 사기</span><span class="tag gold">추가 행동</span></div>
+          ${body}
+        </div>`;
+    }
+    function wireLotto(st, rerender){
+      const b = document.getElementById("btnLotto");
+      if (!b) return;
+      b.onclick = ()=>{
+        if ((S.cash || 0) < LOTTO_COST) return; // 현금 1,000원이 없으면 살 수 없다 (버튼도 비활성화돼 있다)
+        S.cash = Math.round((S.cash - LOTTO_COST) * 10) / 10;
+        const win = Math.random() < LOTTO_ODDS;
+        if (!Array.isArray(S.flags.lottoHistory)) S.flags.lottoHistory = [];
+        S.flags.lottoHistory.push({ stage:S.stageIdx, age:S.age, year:curYear(), win });
+        if (!Array.isArray(S.lottoLog)) S.lottoLog = [];
+        // 결과는 S.lottoLog에만 남긴다 — settleLog에도 넣으면 상단 로그와 박스에 중복으로 뜬다
+        S.lottoLog.push(win
+          ? { stage:S.stageIdx, win:true, cls:"good", text:`로또 1등 당첨! 상금 ${fmt(LOTTO_PRIZE)}이 현금에 더해졌습니다 (확률 0.01%, 게임용 단순화)` }
+          : { stage:S.stageIdx, win:false, cls:"", text:`로또 1장 구매 — 꽝이었습니다 (1,000원 사용, 당첨 확률 0.01%)` });
+        if (win) S.cash += LOTTO_PRIZE;
+        updateHUD();
+        rerender();
+      };
+    }
+
     function renderStage(){
+      destroyActiveMap(); // 지도 화면에서 넘어온 경우 이전 지도 인스턴스를 정리한다
       const st = STAGES[S.stageIdx];
       if (!st){ renderFinal(); return; }
       if (st.type === "housing"){ renderHousingIntro(st); return; }
       const year = curYear();
+      const hasIncome = (S.salary || 0) > 0; // 소득 게이팅: 연봉이 잡힌 뒤에만 집 사고팔기가 열린다
       const shock = shockBanner(S.lastYear, year);
-      const settle = S.settleLog.length ? `<div class="log"><ul>${S.settleLog.map(l=>`<li class="${l.cls}"><span class="dot"></span><span class="log-main"><span>${l.text}</span>${l.stat?`<span class="statline">${l.stat}</span>`:""}</span></li>`).join("")}</ul></div>` : "";
+      const settle = settleLogHTML();
       app.innerHTML = `<div class="card fade">
         <div class="kicker">${st.kicker} · ${year}년</div>
         <h2>${st.title}</h2>
@@ -1757,14 +1963,18 @@
             ${c.est?`<span class="est">${c.est}</span>`:""}
           </button>`).join("")}
         </div>
-        <div class="extra-trade">
+        ${hasIncome ? `<div class="extra-trade">
           <div class="extra-trade-head"><span class="t">집 사고팔기 (지도)</span><span class="tag teal">추가 행동</span></div>
           <p class="small muted" style="margin-top:4px">${S.house
             ? `현재 ${aptById(S.house.aptId).name} 보유 중 · 시가 ${fmt(houseValue())}${S.loan > 0 ? ` · 주담대 잔액 ${fmt(S.loan)}` : ""}. 지금 팔거나, 팔고 다른 단지로 갈아탈 수 있습니다.`
             : `아직 집이 없습니다. ${year}년 시세와 ${year}년 대출 규제로, 지도에서 단지를 골라 살 수 있습니다.`}
           거래는 이 단계의 선택과 별개로 진행됩니다 — 거래를 마쳐도 이 화면으로 돌아와 원래 선택을 이어서 고를 수 있습니다.</p>
           <button class="btn ghost" id="btnExtraTrade" type="button" style="width:100%;margin-top:12px">${S.house ? "매도 · 갈아타기 하러 가기" : "지도에서 단지 고르러 가기"}</button>
-        </div></div>`;
+        </div>` : `<div class="extra-trade locked">
+          <div class="extra-trade-head"><span class="t">집 사고팔기 (지도)</span><span class="tag">소득 생긴 뒤 열림</span></div>
+          <p class="small muted" style="margin-top:4px">취직해서 소득이 생기면 집을 살 수 있어요. 아직 소득이 없어 주택담보대출을 받을 수 없는 시기라, 첫 소득이 생긴 단계부터 이 화면에서도 언제든 집을 사고팔 수 있습니다.</p>
+        </div>`}
+        ${lottoBoxHTML()}</div>`;
       scrollTop();
       app.querySelectorAll(".choice").forEach(btn=>{
         btn.onclick = ()=>{
@@ -1783,6 +1993,7 @@
       });
       const extraBtn = document.getElementById("btnExtraTrade");
       if (extraBtn) extraBtn.onclick = ()=>{ extraTradeSnap = snapshotState(); renderExtraTradeIntro(st); };
+      wireLotto(st, ()=> renderStage());
     }
 
     function renderResult(st, c, res, before, snap){
@@ -1897,7 +2108,7 @@
       housingSnap = null; // 이 단계에서 새로 전략을 고르면 스냅샷도 새로 잡는다
       const year = curYear();
       const shock = shockBanner(S.lastYear, year);
-      const settle = S.settleLog.length ? `<div class="log"><ul>${S.settleLog.map(l=>`<li class="${l.cls}"><span class="dot"></span><span class="log-main"><span>${l.text}</span>${l.stat?`<span class="statline">${l.stat}</span>`:""}</span></li>`).join("")}</ul></div>` : "";
+      const settle = settleLogHTML();
       const own = !!S.house; // 상시 거래로 34세 전에 집을 산 경우도 유주택자로 취급한다 (round가 아니라 실제 보유 여부가 기준)
       app.innerHTML = `<div class="card fade">
         <div class="kicker">${st.round===1 ? "34세 · 생애 최대의 선택" : "39세 · 주거 2막"} · ${year}년</div>
@@ -1908,6 +2119,7 @@
           : `지금 가진 돈은 현금·투자 합쳐 ${fmt(ownFunds())}. 청약 가점은 <b>${cheongyakPoints()}점</b>/84점입니다. 전략부터 고르세요 — 이 선택이 60세 자산의 절반을 결정합니다.`}</p>
         ${settle}
         <div class="choices" id="hChoices"></div>
+        ${lottoBoxHTML()}
       </div>`;
       scrollTop(); updateHUD();
       const box = document.getElementById("hChoices");
@@ -1923,6 +2135,7 @@
       }
       box.innerHTML = opts.map((o,i)=>`<button class="choice" data-i="${i}" type="button"><span class="t">${o.t} ${o.tag?`<span class="tag">${o.tag}</span>`:""}</span><span class="d">${o.d}</span></button>`).join("");
       box.querySelectorAll(".choice").forEach((b,i)=> b.onclick = ()=> opts[i].fn());
+      wireLotto(st, ()=> renderHousingIntro(st));
     }
     function sellHouse(){
       if (!S.house) return 0;
@@ -1979,6 +2192,12 @@
        시세·대출 한도는 전부 거래가 일어나는 해의 값(aptPriceAt·mortgageLimits)을 그대로 쓴다 */
     let extraTradeSnap = null; // 거래 진입 직전 스냅샷 — 결과 미리보기에서 거래를 취소할 때 복원
     function renderExtraTradeIntro(st){
+      const hasIncome = (S.salary || 0) > 0;
+      if (!hasIncome){ // 소득이 없으면 상시 거래를 열지 않는다 (버튼도 무소득 단계에는 잠금 안내로 대체됨)
+        extraTradeSnap = null; // 진입이 막힌 거래의 스냅샷은 남기지 않는다 — stale 스냅샷이 다음 거래를 오염시키지 않게
+        renderStage();
+        return;
+      }
       const year = curYear();
       const own = !!S.house;
       app.innerHTML = `<div class="card fade">
@@ -2067,7 +2286,7 @@
           <br><span class="src">${LOAN_REG_SRC}</span>
         </div>
         <div class="lc-rows">
-          <div class="lc-row"><span class="k">${cfg.priceLabel || "집값 (전용 84㎡)"}</span><span class="v num">${fmt(price)}</span></div>
+          <div class="lc-row"><span class="k">${cfg.priceLabel || ("집값 (" + (apt.area || "전용 84㎡") + ")")}</span><span class="v num">${fmt(price)}</span></div>
           <div class="lc-row"><span class="k">취득세 등 부대비용 (2.5%)</span><span class="v num">${fmt(total - price)}</span></div>
           <div class="lc-row"><span class="k">총 필요 금액</span><span class="v num">${fmt(total)}</span></div>
           <div class="lc-row"><span class="k">가용 자금 (현금·투자${S.jeonse > 0 ? " + 전세보증금 반환분(전세대출 상환 후)" : ""})</span><span class="v num">${fmt(funds)}</span></div>
@@ -2160,7 +2379,7 @@
         const r = doBuy(apt, price, cfg.label, loanAmt);
         const f = mortgageFigures(r.loanAmt, lim);
         const lines = [
-          `${apt.name} 전용 84㎡를 ${fmt(price)}에 매수 (${year}년 ${cfg.label === "청약 당첨" ? "분양가" : "시세"})`,
+          `${apt.name} ${apt.area || "전용 84㎡"}를 ${fmt(price)}에 매수 (${year}년 ${cfg.label === "청약 당첨" ? "분양가" : "시세"})`,
           `자기자본 ${fmt(r.need)} + 주택담보대출 ${fmt(r.loanAmt)} (취득세 등 포함 총 ${fmt(r.total)})`,
           ...(r.loanAmt > 0 ? [
             `<span class="loan-badge">대출 있음</span> 금리 연 ${r.ratePct.toFixed(2)}% (한국은행 기준금리 ${macro(year).rate.toFixed(2)}% + 1.5%p) · ${r.term}년 원리금균등`,
@@ -2179,18 +2398,60 @@
       }
     }
 
+    function aptAreaKey(a){ // 세부 지역 키: 서울·인천은 구, 경기는 시 단위 (gu 표기 두 번째 토큰)
+      const t = String(a.gu || "").split(" ");
+      return t.length > 1 ? (a.region + " " + t[1]) : a.region;
+    }
+    /* 현재 화면에 떠 있는 지도 인스턴스 — 화면을 갈거나 필터·정렬이 바뀔 때 반드시 destroy하고 새로 건다 (지도 누수 방지) */
+    let activeMapHandle = null;
+    function destroyActiveMap(){
+      if (activeMapHandle){ try { activeMapHandle.destroy(); } catch(e){} activeMapHandle = null; }
+    }
     function renderMapBuy(st, label, opts){
+      destroyActiveMap(); // 이전 화면의 지도가 남아 있으면 먼저 정리한다
       const isExtra = !!(opts && opts.extra); // 추가 행동(집 사고팔기)에서 열린 지도면 확정·뒤로가기 모두 거래 흐름으로 되돌린다
       const year = curYear();
-      const list = APTS.filter(a => a.built <= year || a.anchors[0][0] <= year + 1);
-      let sortKey = "priceAsc";
+      // 단지는 준공된 해부터만 매매 대상이다 — 준공 전 단지는 지도에 노출하지도, 살 수도 없다
+      const allList = APTS.filter(a => a.built <= year);
+      let sortKey = (opts && opts.sortKey) || "priceAsc";
+      let filterRegion = (opts && opts.filterRegion) || "전체";
+      let filterArea = (opts && opts.filterArea) || "전체";
+      const viewOpts = ()=>({ extra:isExtra, sortKey, filterRegion, filterArea });
+      const cntRegion = r => allList.filter(a => a.region === r).length;
+      function currentAreaKeys(){
+        const rl = allList.filter(a => filterRegion === "전체" || a.region === filterRegion);
+        return [...new Set(rl.map(aptAreaKey))].sort();
+      }
+      function currentList(){
+        const rl = allList.filter(a => filterRegion === "전체" || a.region === filterRegion);
+        return rl.filter(a => filterArea === "전체" || aptAreaKey(a) === filterArea);
+      }
+      function currentSorted(){
+        return [...currentList()].sort((a,b)=>{
+          if (sortKey==="priceAsc") return aptPriceAt(a,year)-aptPriceAt(b,year);
+          if (sortKey==="priceDesc") return aptPriceAt(b,year)-aptPriceAt(a,year);
+          return b[sortKey]-a[sortKey];
+        });
+      }
+      if (filterArea !== "전체" && !currentAreaKeys().includes(filterArea)) filterArea = "전체";
+      const areaKeys = currentAreaKeys();
+      const list = currentList();
       app.innerHTML = `<div class="card fade">
-        <div class="kicker">${year}년 시세 · 전용 84㎡ 기준</div>
+        <div class="kicker">${year}년 시세 · 전용 84㎡ 기준 (일부 단지는 카드에 표기한 가까운 평형 기준)</div>
         <h2>지도에서 고르는 내 집</h2>
         <p class="small muted">지도의 번호와 아래 카드가 연결됩니다. 학군·역세권·상품성 점수와 가격을 함께 보세요.
         현금이 부족해도 주택담보대출로 살 수 있습니다 — 단지를 고르면 대출 금액을 직접 정하는 계산 화면이 열립니다.
         대출 한도는 그 해의 실제 규제를 따릅니다: ${year}년 LTV 상한 ${regLtvLabel(loanRegFor(year))}${loanRegFor(year).incomeType ? ` · ${loanRegFor(year).incomeType} ${Math.round(loanRegFor(year).incomeRatio * 100)}%` : " · 소득 상한 없음"} (${loanRegFor(year).title}), 금리는 기준금리 ${macro(year).rate.toFixed(2)}%(한국은행) + 1.5%p = 연 ${mortgageRatePct(year).toFixed(2)}%, 만기는 30년 또는 60세까지 중 짧은 쪽(${mortgageTermYears()}년), 원리금균등분할상환입니다. 가용 자금 ${fmt(buyFunds())}.</p>
         <p class="statline" style="margin-top:4px">${year}년 서울 아파트 중위가격 ${fmt(seoulMedianAt(year))} · PIR ${seoulPirAt(year).toFixed(1)}배 — 월급을 한 푼도 안 쓰고 ${seoulPirAt(year).toFixed(1)}년을 모아야 살 수 있는 가격, ${pirDifficulty(seoulPirAt(year))}입니다. (KB부동산 발표값 기반 게임용 근사${year > 2025 ? " · 2026년 이후는 가정 구간" : ""})</p>
+        <div class="filterbar" role="group" aria-label="지역 필터">
+          <span class="small" style="font-weight:700">지역</span>
+          ${["전체","서울","경기","인천"].map(r=>`<button data-r="${r}" class="${r===filterRegion?"on":""}" type="button">${r}${r==="전체" ? ` ${allList.length}` : ` ${cntRegion(r)}`}</button>`).join("")}
+          <select id="aptAreaSel" aria-label="세부 지역 선택">
+            <option value="전체" ${filterArea==="전체"?"selected":""}>세부 지역 전체</option>
+            ${areaKeys.map(k=>`<option value="${k}" ${k===filterArea?"selected":""}>${k}</option>`).join("")}
+          </select>
+        </div>
+        <p class="tiny muted" id="aptCountLine" style="margin-top:8px">${year}년에 거래할 수 있는 단지 ${allList.length}곳 중 ${list.length}곳을 표시합니다. 시세·세대수는 국토교통부 실거래가 공개시스템·KB부동산 시세 기반 게임용 근사입니다.</p>
         <div id="map"></div>
         <p class="tiny muted" id="mapFallback" style="display:none">지도를 불러올 수 없어 목록만 표시합니다.</p>
         <div class="sortbar"><span class="small" style="font-weight:700">정렬</span>
@@ -2201,19 +2462,19 @@
       </div>`;
       scrollTop();
       const listEl = document.getElementById("aptList");
-      let mapHandle = null;
-      const places = list.map(a=>({ label:a.name, lat:a.lat, lng:a.lng, locality:a.gu }));
+      const mapEl = document.getElementById("map");
+      const fallbackEl = document.getElementById("mapFallback");
       function highlightCard(idx){
         listEl.querySelectorAll(".apt").forEach(el=> el.classList.toggle("map-selected", parseInt(el.dataset.idx,10) === idx));
       }
       function draw(){
-        const sorted = [...list].sort((a,b)=>{
-          if (sortKey==="priceAsc") return aptPriceAt(a,year)-aptPriceAt(b,year);
-          if (sortKey==="priceDesc") return aptPriceAt(b,year)-aptPriceAt(a,year);
-          return b[sortKey]-a[sortKey];
-        });
-        listEl.innerHTML = sorted.map((a)=>{
-          const idx = list.indexOf(a);
+        const sorted = currentSorted();
+        if (!sorted.length){
+          listEl.innerHTML = `<p class="small muted" style="padding:16px 0">이 조건에 맞는 단지가 ${year}년에는 아직 없습니다. 지역 필터를 바꾸거나, 단지가 준공되는 해 이후에 다시 와 보세요.</p>`;
+          return;
+        }
+        // 카드 번호는 정렬된 표시 순번(idx+1) — 지도 핀도 같은 순서로 걸어 두 번호가 항상 일치한다
+        listEl.innerHTML = sorted.map((a, idx)=>{
           const price = Math.round(aptPriceAt(a,year));
           const lim = mortgageLimits(price, year);
           const fMax = mortgageFigures(lim.maxLoan, lim);
@@ -2222,7 +2483,7 @@
           const score = (k,v)=>`<div class="score">${k}<div class="bar"><i style="width:${v}%"></i></div></div>`;
           return `<div class="apt" data-idx="${idx}">
             <div class="head"><span class="no">${idx+1}</span><span class="nm">${a.name}</span><span class="price num">${fmt(price)}</span></div>
-            <div class="meta">${a.gu} · ${a.built}년 준공 · 전용 84㎡</div>
+            <div class="meta">${a.gu} · ${a.built}년 준공 · ${a.units ? a.units.toLocaleString() + "세대 · " : ""}${a.area || "전용 84㎡"}</div>
             <p class="small" style="margin-top:8px">${a.note}</p>
             <div class="scores">${score("학군",a.school)}${score("역세권·교통",a.station)}${score("상품성(연식·브랜드)",a.product)}</div>
             <div class="fin">${lim.banned ? `<b style="color:var(--up)">이 시기엔 시가 15억 초과 주택 주담대 금지 (12·16 대책)</b> · ` : ""}대출 가능 최대 <b>${fmt(lim.maxLoan)}</b> (${year}년 규제 · 실효 LTV ${fMax.ltvPct.toFixed(0)}% · ${lim.reg.incomeType || "소득"} 부담 ${fMax.dsrPct.toFixed(0)}%, 금리 연 ${lim.ratePct.toFixed(2)}%) · 한도까지 받으면 필요 자기자본 <b>${fmt(need)}</b> · 월 상환 약 <b>${fmt(fMax.monthly)}</b>${afford ? "" : ` · <b style="color:var(--up)">한도까지 받아도 ${fmt(need-buyFunds())} 부족</b>`}</div>
@@ -2231,6 +2492,7 @@
         }).join("");
         listEl.querySelectorAll("[data-buy]").forEach(b=>{
           b.onclick = (e)=>{ e.stopPropagation();
+            destroyActiveMap(); // 대출 계산 화면으로 넘어가기 전에 지도를 정리한다
             const apt = aptById(b.dataset.buy);
             const price = Math.round(aptPriceAt(apt, year));
             renderLoanBuy(st, { apt, price, label: label || "내 집 마련",
@@ -2241,20 +2503,25 @@
               confirmLabel: "매수 확정하기",
               source:"국토교통부 실거래가 공개시스템·KB부동산 시세의 단지별 대표 거래가 근사, 한국은행 기준금리, 금융위원회 LTV·DSR 규제 기준",
               onDone: isExtra ? (res, before)=> renderExtraTradeResult(st, res, before) : null,
-              back: ()=> renderMapBuy(st, label, opts) });
+              back: ()=> renderMapBuy(st, label, viewOpts()) });
           };
         });
         listEl.querySelectorAll(".apt").forEach(el=>{
           el.addEventListener("click", ()=>{
             const idx = parseInt(el.dataset.idx,10);
             highlightCard(idx);
-            if (mapHandle && mapHandle.selectPlace) mapHandle.selectPlace(idx);
+            if (activeMapHandle && activeMapHandle.selectPlace) activeMapHandle.selectPlace(idx);
           });
         });
       }
-      draw();
-      if (window.MapHelpers){
-        mapHandle = MapHelpers.mountMap(document.getElementById("map"), { places, baseStyle:"light",
+      function mountMapFor(sorted){
+        destroyActiveMap(); // 새 지도를 걸기 전에 이전 인스턴스를 반드시 정리한다
+        mapEl.style.display = "";
+        fallbackEl.style.display = "none";
+        if (!sorted.length){ mapEl.style.display = "none"; return; }
+        if (!window.MapHelpers){ fallbackEl.style.display = "block"; mapEl.style.display = "none"; return; }
+        const places = sorted.map(a=>({ label:a.name, lat:a.lat, lng:a.lng, locality:a.gu }));
+        activeMapHandle = MapHelpers.mountMap(mapEl, { places, baseStyle:"light",
           marker: (_p, index, selected)=>`<div class="pin${selected ? " pin--on" : ""}">${index+1}</div>`,
           onSelectPlace: (idx)=>{
             if (idx === null || idx === undefined){ highlightCard(-1); return; }
@@ -2262,18 +2529,42 @@
             const el = listEl.querySelector(`.apt[data-idx="${idx}"]`);
             if (el) el.scrollIntoView({ block:"nearest", behavior:"smooth" });
           }
-        }, ()=>{ document.getElementById("mapFallback").style.display="block"; document.getElementById("map").style.display="none"; });
-        if (!mapHandle){ document.getElementById("mapFallback").style.display="block"; document.getElementById("map").style.display="none"; }
-      } else {
-        document.getElementById("mapFallback").style.display="block"; document.getElementById("map").style.display="none";
+        }, ()=>{ fallbackEl.style.display="block"; mapEl.style.display="none"; });
+        if (!activeMapHandle){ fallbackEl.style.display="block"; mapEl.style.display="none"; }
       }
+      /* 필터·정렬 변경 시 화면 전체를 다시 그리지 않는다 — 카드와 지도만 갈아 끼워 스크롤 위치가 튀지 않게 한다 */
+      function refreshMapList(){
+        const sel = document.getElementById("aptAreaSel");
+        if (sel){
+          const keys = currentAreaKeys();
+          if (filterArea !== "전체" && !keys.includes(filterArea)) filterArea = "전체";
+          sel.innerHTML = `<option value="전체" ${filterArea==="전체"?"selected":""}>세부 지역 전체</option>` + keys.map(k=>`<option value="${k}" ${k===filterArea?"selected":""}>${k}</option>`).join("");
+          sel.value = filterArea;
+        }
+        const cnt = document.getElementById("aptCountLine");
+        if (cnt) cnt.textContent = `${year}년에 거래할 수 있는 단지 ${allList.length}곳 중 ${currentList().length}곳을 표시합니다. 시세·세대수는 국토교통부 실거래가 공개시스템·KB부동산 시세 기반 게임용 근사입니다.`;
+        draw();
+        mountMapFor(currentSorted());
+      }
+      draw();
+      mountMapFor(currentSorted());
+      app.querySelectorAll(".filterbar button[data-r]").forEach(b=>{
+        b.onclick = ()=>{ // 전체 재렌더(renderMapBuy + scrollTop) 없이 목록·지도만 갱신해 스크롤 위치를 유지한다
+          filterRegion = b.dataset.r; filterArea = "전체";
+          app.querySelectorAll(".filterbar button[data-r]").forEach(x=>x.classList.toggle("on", x===b));
+          refreshMapList();
+        };
+      });
+      const areaSel = document.getElementById("aptAreaSel");
+      if (areaSel) areaSel.onchange = ()=>{ filterArea = areaSel.value; refreshMapList(); };
       app.querySelectorAll(".sortbar button").forEach(b=>{
         b.onclick = ()=>{ sortKey = b.dataset.k;
           app.querySelectorAll(".sortbar button").forEach(x=>x.classList.toggle("on", x===b));
-          draw();
+          refreshMapList(); // 정렬이 바뀌면 핀 순서도 카드 순번에 맞춰 다시 건다
         };
       });
       document.getElementById("btnBack").onclick = ()=>{
+        destroyActiveMap();
         if (isExtra){ // 추가 행동 거래: 갈아타기로 이미 매도했더라도 거래 전 상태로 되돌리고 거래 화면으로 돌아간다
           if (extraTradeSnap) restoreState(extraTradeSnap);
           renderExtraTradeIntro(st);
