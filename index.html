@@ -23,8 +23,8 @@
         --ease:all .15s ease-in-out;
       }
       *{box-sizing:border-box}
-      html{scroll-behavior:smooth}
-      body{margin:0;background:var(--bg);color:var(--body);word-break:keep-all;
+      html{scroll-behavior:smooth;overscroll-behavior:none;overscroll-behavior-y:none}
+      body{overscroll-behavior:none;overscroll-behavior-y:none;margin:0;background:var(--bg);color:var(--body);word-break:keep-all;
         font-family:var(--font);font-size:15px;
         letter-spacing:-.02em;
         line-height:1.6;-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
@@ -195,6 +195,26 @@
       .extra-trade{margin-top:16px;background:var(--accent-soft);border:1px solid var(--line);border-radius:12px;padding:16px}
       .extra-trade-head{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
       .extra-trade-head .t{font-weight:600;font-size:16px;color:var(--ink)}
+
+        /* ---------- 확률 판정 결과 배너 ---------- */
+      .prob-banner{display:flex;gap:12px;align-items:flex-start;border-radius:12px;padding:16px;margin-bottom:16px;border:1px solid var(--line)}
+      .prob-banner.ok{background:var(--teal-soft);border-color:var(--teal)}
+      .prob-banner.fail{background:color-mix(in srgb,var(--up) 7%, var(--surface));border-color:color-mix(in srgb,var(--up) 45%, var(--line))}
+      .prob-ico{flex:none;width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:16px;color:#fff;line-height:1}
+      .prob-banner.ok .prob-ico{background:var(--teal)}
+      .prob-banner.fail .prob-ico{background:var(--up)}
+      .prob-body{min-width:0;flex:1}
+      .prob-head{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+      .prob-badge{font-size:13px;font-weight:700;border-radius:999px;padding:2px 10px;color:#fff;line-height:1.5}
+      .prob-banner.ok .prob-badge{background:var(--teal)}
+      .prob-banner.fail .prob-badge{background:var(--up)}
+      .prob-name{font-weight:700;color:var(--ink);font-size:16px;line-height:1.3}
+      .prob-meta{font-size:13px;font-weight:600;color:var(--ink2);margin-top:4px}
+      .prob-next{font-size:14px;color:var(--ink2);margin-top:2px;text-wrap:pretty}
+      .prob-lock{font-size:13px;color:var(--ink3);margin-top:6px}
+      /* 선택지 안으로 깊이 들어간 화면의 상단 뒤로가기 행 — 하단 버튼과 같은 동작 */
+      .top-back{display:flex;margin-bottom:16px}
+      .top-back .btn{height:36px;font-size:13px;padding:0 12px}
 
       /* ---------- result ---------- */
       .result-hero{text-align:center;padding:8px 0 8px}
@@ -397,6 +417,7 @@
         .src::before{color:#09090B}
         select:focus,input[type=text]:focus{box-shadow:0 0 0 3px rgba(96,165,250,.25)}
         .btn.accent{color:#09090B}
+        .prob-banner .prob-ico,.prob-banner .prob-badge{color:#09090B}
       }
 
     </style>
@@ -777,7 +798,7 @@
     const app = document.getElementById("app");
     const hud = document.getElementById("hud");
     let S = null;
-    const STAGE_AGES = [14,16,18,19,21,23,25,26,29,31,33,34,36,39,42,44,47,49,52,55];
+    const STAGE_AGES = [14,18,19,23,26,29,31,34,39,44,49,55]; // 12턴 구조: 14 중1 → 18 고3 → 19 진학 → 23 대학·취준 → 26 첫직장 → 29 재테크 → 31 결혼 → 34 내집마련 → 39 갈아타기 → 44 커리어 → 49 자산재배분 → 55 은퇴설계 → 60 정산
     function curYear(){ return S.birth + S.age; }
     function aptById(id){ return APTS.find(a=>a.id===id); }
     function houseValue(){ return S.house ? aptPriceAt(aptById(S.house.aptId), curYear()) : 0; }
@@ -896,6 +917,7 @@
       const startAge = S.age, startYear = curYear();
       let invStart = S.invest, houseStart = houseValue();
       let loanPaidYears = 0, loanPaidTotal = 0; // 이 구간에 실제로 빠져나간 주담대 원리금 (정산 로그용)
+      let childCostYears = 0, eduCostYears = 0; // 결혼 후 자동으로 반영된 돌봄비·교육비 연수 (정산 로그용) — 비혼이면 kids=0이라 절대 적용되지 않는다
       while (S.age < toAge){
         S.age++;
         const y = curYear(), m = macro(y);
@@ -914,8 +936,12 @@
           if (S.job === "gamerPro" && S.age === 28){ S.job = "mid"; S.salary = Math.round(bigCorpSalary(y) * 0.75); careerLines.push({cls:"", text:`프로게이머 은퇴 — 일반 취업으로 전향해 연봉이 ${fmt(S.salary)} 수준으로 조정됐습니다`}); }
           let save = S.salary * S.saveRate;
           if (S.married) save *= 1.5; // 맞벌이 가구 저축 여력
-          if (S.eduSpendUntil && S.age <= S.eduSpendUntil) save -= 900;
-          if (S.childCostUntil && S.age <= S.childCostUntil) save -= 600; // 육아 돌봄비·부모 부양비 구간
+          if (S.eduSpendUntil && S.age <= S.eduSpendUntil) save -= 1000;
+          if (S.childCostUntil && S.age <= S.childCostUntil) save -= 1000; // 육아 돌봄비·부모 부양비 구간
+          // 12턴 구조: 육아·자녀교육 전용 단계가 없어, 결혼해 자녀가 있는 경우에만 돌봄비(32~38세)·교육비(36~44세)를 연도 정산으로 자동 반영한다.
+          // 비혼(또는 자녀 없음)이면 S.kids가 0이라 이 블록 자체가 돌지 않아 아이 관련 지출·문구가 일절 생기지 않는다. 명시 구간(childCostUntil·eduSpendUntil)과 겹치는 해는 중복 차감하지 않는다
+          if (S.kids > 0 && S.age >= 32 && S.age <= 38 && !(S.childCostUntil && S.age <= S.childCostUntil)){ save -= 1000; childCostYears++; }
+          if (S.kids > 0 && S.age >= 36 && S.age <= 44 && !(S.eduSpendUntil && S.age <= S.eduSpendUntil)){ save -= 1000; eduCostYears++; }
           if (S.sideIncome && S.age <= (S.sideIncomeUntil || 0)) save += S.sideIncome; // 부업·파트타임 소득 구간
           if (S.flags.careLeave && S.age === 34) save *= 0.4; // 육아휴직 1년 — 소득 공백 구간
           if (S.studentLoan > 0){ const pay = Math.min(S.studentLoan, 420); S.studentLoan -= pay; save -= pay; }
@@ -962,6 +988,8 @@
           ? `주담대 원리금 연 ${fmtShort(loanPaidTotal / loanPaidYears)}씩 ${loanPaidYears}년간 자동 상환 — 남은 잔액 ${fmtShort(S.loan)}, 남은 만기 ${S.loanYearsLeft}년`
           : `주담대 원리금을 ${loanPaidYears}년간 자동 상환해 대출을 모두 갚았습니다`,
           stat: worldStatLine(curYear())});
+      if (childCostYears > 0) logs.push({cls:"", text:`자녀 돌봄비 연 10,000,000원씩 ${childCostYears}년간 자동 반영 (결혼 후 육아 구간 정산)`, stat:"육아정책연구소·통계청 — 영유아 돌봄·보육 비용 대표값 근사"});
+      if (eduCostYears > 0) logs.push({cls:"", text:`자녀 교육비 연 10,000,000원씩 ${eduCostYears}년간 자동 반영 (자녀 학령기 구간 정산)`, stat:"통계청 사교육비조사 — 초·중학생 1인당 월평균 사교육비 흐름 근사"});
       logs.push(...careerLines);
       return logs;
     }
@@ -1314,12 +1342,13 @@
 
     function startGame(birth, region){
       stopShowcase();
+      pendingHousingProb = null; // 새 게임에서는 이전 판정 배너를 비운다
       S = { birth, region, nick:DEFAULT_NICK, age:14, stageIdx:0,
         cash:500, invest:0, jeonse:0, jeonseLoan:0, studentLoan:0,
         salary:0, job:null, saveRate:0.34, allocInv:0, speculative:false, invProduct:null,
         house:null, loan:0, loanRate:0, loanPay:0, loanTerm:0, loanYearsLeft:0, loanStartYear:0, extraProp:null,
         married:false, kids:0, tongjangStart:null, edu:null, eduSpendUntil:0, childCostUntil:0, sideIncome:0, sideIncomeUntil:0,
-        flags:{}, history:[], shocksShown:{}, settleLog:[], lottoLog:[], lastYear:birth+13 };
+        flags:{}, history:[], shocksShown:{}, settleLog:[], lottoLog:[], gambleLog:[], lastProb:null, lastYear:birth+13 };
       hud.classList.remove("hidden");
       armExitGuard();
       updateHUD();
@@ -1349,57 +1378,44 @@
             apply(){ S.flags.track = "game";
               return { lines:["게임 트랙 진입 — 프로게이머 도전을 준비합니다", "학업 성적 하락으로 의대·로스쿨 도전 경로는 닫힙니다"], source:"프로게이머 스타 도달 확률은 게임용으로 1% 미만으로 단순화" }; } },
         ]},
-      { age:16, title:"중학교 졸업, 어느 고등학교로", kicker:"16세 · 중학교 3학년",
-        desc:()=>"고등학교 진학이 다가옵니다. 14세에 고른 트랙에 맞는 학교를 고르면 다음 도전의 확률이 달라집니다.",
+      { age:18, title:"고등학교 3학년, 수능의 해", kicker:"18세 · 고등학교 3학년",
+        desc:()=>"입시가 코앞입니다. 14세에 고른 트랙 안에서 마지막 승부를 걸지, 균형을 잡을지 정합니다.",
         choices:()=>{
           if (S.flags.track === "sports") return [
             { t:"체육고 · 예체능고 진학", d:"운동에 올인하는 환경. 프로 도전 확률이 오릅니다 (스타 약 3% · 프로 데뷔 약 30% 수준으로 상승).", tag:"체육",
               apply(){ S.flags.sportsAce = true;
                 return { lines:["체육고 진학 — 전국대회·프로 도전에서 유리해집니다", "대신 학업 트랙은 더 멀어집니다"], source:"체육특기자 진로 구조 (게임용 단순화)" }; } },
-            { t:"일반고 체육부", d:"학업과 병행하며 운동을 이어갑니다. 지도자·체육교사 경로가 안정적이고, 23세 프로 도전에서 데뷔 확률 +5%p 보너스가 붙습니다.", tag:"안정",
-              apply(){ S.flags.sportsSteady = true;
-                return { lines:["일반고 체육부 진학 — 학업 병행으로 진로 폭이 넓습니다", "23세 프로 도전 데뷔 확률 +5%p 보너스 확보"], source:"게임용 단순화" }; } },
-          ];
-          if (S.flags.track === "game") return [
-            { t:"e스포츠 아카데미 병행", d:"일반고에 다니며 프로 지망 아카데미를 병행합니다. 입단 도전 확률이 오릅니다.", tag:"게임",
-              apply(){ S.flags.gameScout = true;
-                return { lines:["아카데미 병행 — 19세 프로 입단 도전 확률이 오릅니다 (프로 데뷔 약 15%)"], source:"e스포츠 아카데미 구조 참고 (게임용 단순화)" }; } },
-            { t:"일반고 · 게임은 취미로", d:"학업을 우선해 성적 하락을 줄입니다. 프로 도전은 19세에 그대로 할 수 있고, 실패해도 인서울 4년제 진학으로 이어집니다.", tag:"안정",
-              apply(){ S.flags.gameBalance = true;
-                return { lines:["학업 우선 — 19세 프로 도전에 실패해도 인서울 4년제 진학으로 이어집니다"], source:"게임용 단순화" }; } },
-          ];
-          return [
-            { t:"특목고 · 자사고 도전", d:"외고·과학고·자사고에 도전합니다. 합격 확률 약 35% (게임용 단순화). 합격하면 성적 최상위권 환경에서 의대·로스쿨 도전이 유리해집니다.", tag:"확률 도전",
-              apply(){ if (Math.random() < 0.35){ S.flags.topGrade = true;
-                  return { lines:["특목고·자사고 합격! 성적 최상위권 환경에 들어갑니다", "19세 의대 도전 합격 확률이 약 30%까지 오릅니다"], source:"특목고·자사고 입시 경쟁 구조 참고 (게임용으로 합격 확률 35%로 단순화)" }; }
-                return { lines:["특목고 도전은 불발 — 일반고로 진학합니다", "일반고 상위권 트랙은 그대로 이어집니다"], source:"특목고·자사고 입시 경쟁 구조 참고 (게임용 단순화)" }; } },
-            { t:"일반고 진학", d:"내신 관리에 유리한 일반고에서 상위권을 노립니다. 의대 도전은 가능하지만 확률은 약 15%입니다.", tag:"안정",
-              apply(){ S.flags.topGrade = false;
-                return { lines:["일반고 진학 — 내신 상위권을 목표로 합니다"], source:"게임용 단순화" }; } },
-          ];
-        }},
-      { age:18, title:"고등학교 3학년, 수능의 해", kicker:"18세 · 고등학교 3학년",
-        desc:()=>"입시가 코앞입니다. 14세에 고른 트랙 안에서 마지막 승부를 걸지, 균형을 잡을지 정합니다.",
-        choices:()=>{
-          if (S.flags.track === "sports") return [
             { t:"전국대회 출전 도전", d:"입상하면 특기생 진학과 프로 도전에서 유리해집니다. 입상 확률 약 25% (게임용 단순화).", tag:"확률 도전",
               apply(){ if (Math.random() < 0.25){ S.flags.sportsAce = true;
-                  return { lines:["전국대회 입상! 체육 특기생 진학이 유리해지고, 프로 도전 확률이 오릅니다 (스타 약 3% · 프로 데뷔 약 30%)"], source:"전국대회 입상 확률은 게임용 단순화" }; }
-                return { lines:["입상은 놓쳤지만 실전 경험이 쌓였습니다", "체육 트랙은 그대로 이어집니다"], source:"전국대회 입상 확률은 게임용 단순화" }; } },
+                  return { lines:["전국대회 입상! 체육 특기생 진학이 유리해지고, 프로 도전 확률이 오릅니다 (스타 약 3% · 프로 데뷔 약 30%)"], source:"전국대회 입상 확률은 게임용 단순화",
+                    prob:{ name:"전국대회 출전 도전", probText:"입상 확률 25%", success:true, resultText:"입상 성공", nextText:"다음 전개 — 체육 특기생 진학이 유리해지고, 23세 프로 도전 확률이 스타 약 3% · 프로 데뷔 약 30%로 오릅니다." } }; }
+                return { lines:["입상은 놓쳤지만 실전 경험이 쌓였습니다", "체육 트랙은 그대로 이어집니다"], source:"전국대회 입상 확률은 게임용 단순화",
+                  prob:{ name:"전국대회 출전 도전", probText:"입상 확률 25%", success:false, resultText:"입상 실패", nextText:"다음 전개 — 입상은 놓쳤지만 체육 트랙은 그대로 이어집니다. 학업 병행으로 지도자·체육교사 경로도 열려 있습니다." } }; } },
             { t:"기초 체력 · 학업 병행", d:"부상 위험을 줄이고 지도자·체육교사 경로까지 열어둡니다. 23세 프로 도전에서 데뷔 확률 +5%p 보너스가 붙습니다.", tag:"안정",
               apply(){ S.flags.sportsSteady = true;
                 return { lines:["학업을 병행해 체육 관련 직업 경로가 안정적입니다", "23세 프로 도전에서 데뷔 확률 +5%p 보너스가 붙습니다", "프로 도전은 23세 단계에서 그대로 할 수 있습니다"], source:"게임용 단순화" }; } },
           ];
           if (S.flags.track === "game") return [
+            { t:"e스포츠 아카데미 병행", d:"일반고에 다니며 프로 지망 아카데미를 병행합니다. 입단 도전 확률이 오릅니다.", tag:"게임",
+              apply(){ S.flags.gameScout = true;
+                return { lines:["아카데미 병행 — 19세 프로 입단 도전 확률이 오릅니다 (프로 데뷔 약 15%)"], source:"e스포츠 아카데미 구조 참고 (게임용 단순화)" }; } },
             { t:"아마추어 대회 출전", d:"주목받으면 19세 프로 입단 도전 확률이 오릅니다. 주목받을 확률 약 20% (게임용 단순화).", tag:"확률 도전",
               apply(){ if (Math.random() < 0.20){ S.flags.gameScout = true;
-                  return { lines:["대회에서 주목받았습니다 — 19세 프로 입단 도전 확률이 오릅니다 (프로 데뷔 약 15%)"], source:"아마추어 대회 주목 확률은 게임용 단순화" }; }
-                return { lines:["입상은 놓쳤습니다. 프로 입단 도전은 19세에 그대로 할 수 있습니다"], source:"게임용 단순화" }; } },
+                  return { lines:["대회에서 주목받았습니다 — 19세 프로 입단 도전 확률이 오릅니다 (프로 데뷔 약 15%)"], source:"아마추어 대회 주목 확률은 게임용 단순화",
+                    prob:{ name:"아마추어 대회 출전", probText:"주목받을 확률 20%", success:true, resultText:"성공", nextText:"다음 전개 — 스카우트 눈에 띄어 19세 프로 입단 도전 확률이 오릅니다 (프로 데뷔 약 15%)." } }; }
+                return { lines:["입상은 놓쳤습니다. 프로 입단 도전은 19세에 그대로 할 수 있습니다"], source:"게임용 단순화",
+                  prob:{ name:"아마추어 대회 출전", probText:"주목받을 확률 20%", success:false, resultText:"실패", nextText:"다음 전개 — 입상은 놓쳤지만 19세 프로 입단 도전은 그대로 할 수 있습니다." } }; } },
             { t:"학업과 병행", d:"성적 하락을 줄여, 프로 도전에 실패해도 인서울 4년제 진학으로 무리 없이 진행합니다.", tag:"안정",
               apply(){ S.flags.gameBalance = true;
                 return { lines:["학업을 병행해, 19세 프로 도전에 실패해도 인서울 4년제 진학으로 이어집니다"], source:"게임용 단순화" }; } },
           ];
           return [
+            { t:"특목고 · 자사고 도전", d:"외고·과학고·자사고에 도전합니다. 합격 확률 약 35% (게임용 단순화). 합격하면 성적 최상위권 환경에서 의대·로스쿨 도전이 유리해집니다.", tag:"확률 도전",
+              apply(){ if (Math.random() < 0.35){ S.flags.topGrade = true;
+                  return { lines:["특목고·자사고 합격! 성적 최상위권 환경에 들어갑니다", "19세 의대 도전 합격 확률이 약 30%까지 오릅니다"], source:"특목고·자사고 입시 경쟁 구조 참고 (게임용으로 합격 확률 35%로 단순화)",
+                    prob:{ name:"특목고·자사고 입학 도전", probText:"합격 확률 35%", success:true, resultText:"합격", nextText:"다음 전개 — 성적 최상위권 환경에서 고교 생활을 시작합니다. 19세 의대 도전 합격 확률이 약 30%로 오릅니다." } }; }
+                return { lines:["특목고 도전은 불발 — 일반고로 진학합니다", "일반고 상위권 트랙은 그대로 이어집니다"], source:"특목고·자사고 입시 경쟁 구조 참고 (게임용 단순화)",
+                  prob:{ name:"특목고·자사고 입학 도전", probText:"합격 확률 35%", success:false, resultText:"불합격", nextText:"다음 전개 — 일반고로 진학합니다. 일반고 상위권 트랙은 그대로 이어지고, 의대 도전은 약 15% 확률로 가능합니다." } }; } },
             { t:"최상위권 심화 — 의대·로스쿨 목표", d:"성적 최상위권을 유지합니다. 19세 의대 도전 합격 확률이 약 30%까지 오릅니다.", tag:"학업",
               apply(){ S.flags.topGrade = true;
                 return { lines:["성적 최상위권 유지 — 19세 의대 도전 합격 확률 약 30% (게임용 단순화)"], source:"의대·로스쿨 도전 확률은 게임용 단순화" }; } },
@@ -1435,11 +1451,13 @@
               if (Math.random() < p){ S.edu="medical"; S.flags.medical = true;
                 const medLoan = Math.round(tuition(curYear())*6*0.6); S.studentLoan += medLoan;
                 return { lines:["의대 합격! 의·치대 전문직 트랙에 진입했습니다", `의대 6년 등록금 — 학자금대출 ${fmt(medLoan)} 발생 (졸업 후 취업 시점부터 연 420만원씩 상환)`, "26세 첫 직장 단계에서 의사·치과의사 경로가 열립니다", "의사 국가고시 합격률은 약 95% 수준이라 이후 수련 진입은 안정적입니다"],
-                  source:"보건복지부 — 의사 국가고시 합격률 약 95% · 의대 도전 합격 확률은 게임용으로 단순화(최상위권 30% · 상위권 15%) · 등록금은 통계청·교육부 대학등록금 통계 근사" }; }
+                  source:"보건복지부 — 의사 국가고시 합격률 약 95% · 의대 도전 합격 확률은 게임용으로 단순화(최상위권 30% · 상위권 15%) · 등록금은 통계청·교육부 대학등록금 통계 근사",
+                  prob:{ name:"의대 도전", probText:"합격 확률 " + Math.round(p*100) + "%", success:true, resultText:"합격", nextText:"다음 전개 — 의대에 진학해 6년 의대 생활을 시작합니다. 26세 첫 직장 단계에서 의사·치과의사 경로가 열립니다." } }; }
               S.edu="seoul4"; S.flags.lawTrack = true;
               const failLoan = Math.round(tuition(curYear())*4*0.6); S.studentLoan += failLoan;
               return { lines:["의대 도전은 불발 — 인서울 4년제 일반학과로 진학합니다", `학자금대출 ${fmt(failLoan)} 발생 (졸업 후 취업 시점부터 연 420만원씩 상환)`, "로스쿨 트랙에 진입했습니다 — 26세 첫 직장 단계에서 로스쿨 도전이 열립니다", "회계사 같은 다른 전문직 경로도 그대로 남아 있습니다"],
-                source:"의대 도전 합격 확률은 게임용으로 단순화(최상위권 30% · 상위권 15%) · 등록금은 통계청·교육부 대학등록금 통계 근사" }; } },
+                source:"의대 도전 합격 확률은 게임용으로 단순화(최상위권 30% · 상위권 15%) · 등록금은 통계청·교육부 대학등록금 통계 근사",
+                prob:{ name:"의대 도전", probText:"합격 확률 " + Math.round(p*100) + "%", success:false, resultText:"불합격", nextText:"다음 전개 — 인서울 4년제 일반학과로 진학합니다. 로스쿨 트랙이 열려 26세에 로스쿨 도전이 가능하고, 회계사 경로도 남아 있습니다." } }; } },
           { t:"로스쿨 목표 — 명문대 진학", d:"법학·상경 명문대에 진학해 졸업 후 로스쿨에 도전합니다. 입학·합격 판정은 26세 첫 직장 단계에서 합니다.", tag:"전문직 트랙",
             apply(){ S.edu="seoul4"; S.flags.lawTrack = true;
               const lawLoan = Math.round(tuition(curYear())*4*0.6); S.studentLoan += lawLoan;
@@ -1457,55 +1475,52 @@
             est:"스타 약 0.8% · 프로 데뷔 약 7~15% (게임용 단순화)",
             apply(){ const roll = Math.random(); const starP = 0.008, proP = S.flags.gameScout ? 0.15 : 0.07;
               if (roll < starP){ S.flags.proGamer = "star"; S.edu = "pro";
-                return { lines:["세계가 주목하는 스타로 데뷔! 21·23·25세 단계에서도 프로 활동으로 수입을 얻고, 26세 단계에서 스타 프로게이머 커리어가 열립니다", "단, 선수 수명은 짧아 30세 전후 스트리머·코치로 전향합니다"], source:"프로게이머 스타 도달 확률은 게임용으로 1% 미만으로 단순화" }; }
+                return { lines:["세계가 주목하는 스타로 데뷔! 23세 단계에서도 프로 활동으로 수입을 얻고, 26세 단계에서 스타 프로게이머 커리어가 열립니다", "단, 선수 수명은 짧아 30세 전후 스트리머·코치로 전향합니다"], source:"프로게이머 스타 도달 확률은 게임용으로 1% 미만으로 단순화",
+                  prob:{ name:"프로게이머 도전", probText:"스타 확률 약 0.8% · 프로 데뷔 확률 약 " + Math.round(proP*100) + "%", success:true, resultText:"스타 데뷔 성공", nextText:"다음 전개 — 스타 프로게이머로 데뷔합니다. 23세 단계에서도 프로 활동 수입이 이어지고, 26세에 스타 커리어가 열립니다." } }; }
               if (roll < starP + proP){ S.flags.proGamer = "pro"; S.edu = "pro";
-                return { lines:["프로팀 입단 성공 — 21·23·25세 단계에서도 프로 활동으로 수입을 얻고, 26세 단계에서 프로게이머 커리어가 열립니다", "선수 수명은 20대에 집중됩니다"], source:"프로게이머 평균 데뷔·은퇴 연령 참고 (게임용 단순화)" }; }
+                return { lines:["프로팀 입단 성공 — 23세 단계에서도 프로 활동으로 수입을 얻고, 26세 단계에서 프로게이머 커리어가 열립니다", "선수 수명은 20대에 집중됩니다"], source:"프로게이머 평균 데뷔·은퇴 연령 참고 (게임용 단순화)",
+                  prob:{ name:"프로게이머 도전", probText:"스타 확률 약 0.8% · 프로 데뷔 확률 약 " + Math.round(proP*100) + "%", success:true, resultText:"프로 데뷔 성공", nextText:"다음 전개 — 프로팀에 입단합니다. 23세 단계에서도 프로 활동 수입이 이어지고, 26세에 프로게이머 커리어가 열립니다." } }; }
               if (S.flags.gameBalance){ S.edu = "seoul4"; const gbLoan = Math.round(tuition(curYear())*4*0.6); S.studentLoan += gbLoan;
-                return { lines:["입단 불발 — 학업을 병행해 둔 덕에 인서울 4년제 일반학과로 진학합니다", `학자금대출 ${fmt(gbLoan)} 발생 (졸업 후 취업 시점부터 연 420만원씩 상환)`], source:"게임용 단순화 — 학업 병행 시 일반 진학 경로 유지 · 등록금은 통계청·교육부 대학등록금 통계 근사" }; }
+                return { lines:["입단 불발 — 학업을 병행해 둔 덕에 인서울 4년제 일반학과로 진학합니다", `학자금대출 ${fmt(gbLoan)} 발생 (졸업 후 취업 시점부터 연 420만원씩 상환)`], source:"게임용 단순화 — 학업 병행 시 일반 진학 경로 유지 · 등록금은 통계청·교육부 대학등록금 통계 근사",
+                  prob:{ name:"프로게이머 도전", probText:"스타 확률 약 0.8% · 프로 데뷔 확률 약 " + Math.round(proP*100) + "%", success:false, resultText:"입단 실패", nextText:"다음 전개 — 학업을 병행해 둔 덕에 인서울 4년제 일반학과로 진학합니다." } }; }
               S.edu = "college2";
-              return { lines:["입단 불발 — 전문대·기술직 트랙으로 진학합니다", "게임에 쏟은 시간만큼 학업 트랙은 낮아졌습니다"], source:"게임용 단순화" }; } },
+              return { lines:["입단 불발 — 전문대·기술직 트랙으로 진학합니다", "게임에 쏟은 시간만큼 학업 트랙은 낮아졌습니다"], source:"게임용 단순화",
+                prob:{ name:"프로게이머 도전", probText:"스타 확률 약 0.8% · 프로 데뷔 확률 약 " + Math.round(proP*100) + "%", success:false, resultText:"입단 실패", nextText:"다음 전개 — 전문대·기술직 트랙으로 진학합니다." } }; } },
           ] : []),
         ]},
-      { age:21, title:"대학 생활, 캠퍼스의 시간 배분", kicker:"21세 · 대학 생활",
-        desc:()=>"대학 생활이 본격화됩니다. 학점, 경험, 돈 — 어디에 시간을 쓰느냐가 첫 직장의 출발선을 바꿉니다.",
+      { age:23, title:"대학 생활 · 스펙과 취업 준비", kicker:"23세 · 대학 생활 · 취업 준비",
+        desc:()=>"대학 생활부터 졸업·취업 준비까지의 구간입니다. 학점·경험·돈과 취업 준비 방향 — 어디에 시간을 쓰느냐가 26세 첫 직장의 출발선을 바꿉니다.",
         choices:()=>[
-          { t:"학점 · 스펙 관리", d:"학점과 자격 준비에 집중합니다. 첫 직장 단계에서 대기업 합격·연봉 보너스가 붙습니다.", tag:"스펙",
-            apply(){ S.flags.spec = true;
-              return { lines:["학점·스펙 우위 확보 — 첫 직장 단계에서 보너스"], source:"고용노동부 채용동향조사 — 학점·자격 보유자 우대 경향" }; } },
           { t:"인턴십 · 실무 경험", d:"방학 인턴과 대외활동으로 실무를 익힙니다. 중견·중소 취업 시 연봉 보너스가 붙습니다.", tag:"경험",
             apply(){ S.flags.intern = true;
               return { lines:["실무 경험 확보 — 중견·중소 첫 연봉 +5% 보너스"], source:"고용노동부 — 인턴 경험 보유자 채용 우대 (채용동향조사)" }; } },
-          { t:"아르바이트로 종잣돈", d:"생활비를 스스로 벌며 졸업합니다. 졸업 시점 현금이 두둑해집니다.",
-            apply(){ S.cash += 700;
-              return { lines:["종잣돈 7,000,000원 확보"], source:"통계청 가계금융복지조사 — 20대 가구 금융자산 참고" }; } },
-          { t:"동아리 · 인맥 · 경험", d:"사람과 경험을 쌓습니다. 눈에 보이는 스펙은 없지만 42세 커리어 전환 때 이직 네트워크가 됩니다.", tag:"인맥",
+          { t:"동아리 · 인맥 · 경험", d:"사람과 경험을 쌓습니다. 눈에 보이는 스펙은 없지만 44세 커리어 단계에서 이직 네트워크가 됩니다.", tag:"인맥",
             apply(){ S.flags.network = true;
-              return { lines:["네트워크 자산 확보 — 42세 커리어 전환 단계에서 이직 보너스"], source:"게임용 단순화 — 인맥의 경력 효과" }; } },
-          ...(S.flags.proGamer ? [
-          { t:"프로팀 주전 경쟁 — 시즌 소화", d:"데뷔한 프로팀에서 시즌을 뛰며 연봉·상금을 법니다. 학점·스펙은 쌓기 어렵지만 커리어 수입이 시작됩니다.", tag:"프로 활동",
-            apply(){ const pay = S.flags.proGamer === "star" ? 4000 : 1500; S.cash += pay;
-              S.salary = Math.round(profIncome(S.flags.proGamer === "star" ? "gamerStar" : "gamerPro", curYear()));
-              return { lines:[`프로 활동 수입 ${fmt(pay)} 확보 (연봉·상금·방송 수입 합산 근사)`, `프로 활동 연 소득 ${fmt(S.salary)}이 연봉으로도 잡힙니다 — 소득이 생겼으니 집 사고팔기(지도)도 이때부터 열립니다`, "23·25세에도 프로 활동 선택지가 이어지고, 26세에 정식 커리어로 연결됩니다"], source:"프로게이머 연봉·상금 분포 참고 (게임용 근사)" }; } },
-          ] : []),
-        ]},
-      { age:23, title:"대학 후반, 스펙의 갈림길", kicker:"23세 · 취업 준비",
-        desc:()=>"졸업이 다가옵니다. 남은 시간과 돈을 어디에 쓰느냐가 첫 직장의 크기를 바꿉니다.",
-        choices:()=>[
+              return { lines:["네트워크 자산 확보 — 44세 커리어 단계에서 이직 보너스"], source:"게임용 단순화 — 인맥의 경력 효과" }; } },
+          { t:"공기업 · 공공기관 준비", d:"NCS와 전공 시험을 준비합니다. 26세 첫 직장에서 공기업을 고르면 초임 보너스가 붙습니다.", tag:"안정",
+            apply(){ S.flags.prepPublic = true; S.cash -= 1000;
+              return { lines:["준비 비용 10,000,000원 지출", "공기업 첫 직장 선택 시 초임 +5% 보너스"], source:"공공기관 경영정보공개(알리오) — NCS 기반 채용 구조" }; } },
+          { t:"대기업 공채 준비", d:"인적성과 면접을 집중 준비합니다. 26세 첫 직장에서 대기업을 고르면 초임 보너스가 붙습니다.", tag:"공채",
+            apply(){ S.flags.prepBig = true; S.cash -= 1000;
+              return { lines:["준비 비용 10,000,000원 지출", "대기업 첫 직장 선택 시 초임 +4% 보너스"], source:"고용노동부 채용동향조사 — 대기업 공채 구조" }; } },
+          { t:"공무원 시험 준비", d:"학원비·준비 비용으로 1,000만원을 쓰고 9급 공무원에 도전합니다. 26세 첫 직장 단계에서 공무원 선택지가 열립니다.", tag:"공무원",
+            apply(){ S.flags.civilTrack = true; S.cash -= 1000;
+              return { lines:["준비 비용 10,000,000원 지출", "26세 첫 직장 단계에서 공무원 선택지가 열립니다"], source:"인사혁신처 — 국가공무원 9급 공채 구조" }; } },
           { t:"청약통장 가입 + 매달 10만원", d:"지금 만든 통장이 10년 뒤 내 집 마련의 무기가 됩니다. 청약 가점의 핵심은 '기간'.", tag:"청약 가점",
             apply(){ S.tongjangStart = 23;
               return { lines:["주택청약종합저축 가입 — 가점제에서 가입기간은 만 17점", "34세 청약 도전 때 결정적 차이를 만듭니다"],
                 source:"국토교통부 청약 가점제 — 청약통장 가입기간 최대 17점/총 84점" }; } },
-          { t:"어학·자격증 올인", d:"토익, 기사 자격증, 인턴 준비에 300만원을 씁니다. 대기업 서류 통과율이 오릅니다.",
-            apply(){ S.cash -= 300; S.flags.spec = true;
-              return { lines:["준비 비용 3,000,000원 지출", "첫 직장 단계에서 대기업 합격·연봉 보너스"],
+          { t:"어학·자격증 올인", d:"토익, 기사 자격증, 인턴 준비에 1,000만원을 씁니다. 대기업 서류 통과율이 오릅니다.",
+            apply(){ S.cash -= 1000; S.flags.spec = true;
+              return { lines:["준비 비용 10,000,000원 지출", "첫 직장 단계에서 대기업 합격·연봉 보너스"],
                 source:"고용노동부 — 자격·어학 보유 시 대졸 신규채용 우대 (채용동향조사)" }; } },
           { t:"교환학생 · 해외 경험", d:"1,500만원을 씁니다. 글로벌 기업과 외국계 취업의 문이 열립니다.", tag:"비용 발생",
             apply(){ S.cash -= 500; S.studentLoan += 1000; S.flags.global = true;
               return { lines:["비용 15,000,000원 (일부 대출)", "외국계·글로벌 기업 선택 시 연봉 +10%"],
                 source:"교육부 — 해외 경험 보유자 외국계 기업 취업 비중 통계 근사" }; } },
           { t:"아르바이트로 종잣돈", d:"등록금과 생활비를 스스로 벌며 졸업합니다. 졸업 시점에 현금이 남습니다.",
-            apply(){ S.cash += 900;
-              return { lines:["종잣돈 9,000,000원 확보", "스펙 보너스는 없지만 출발 현금이 두둑합니다"],
+            apply(){ S.cash += 2000;
+              return { lines:["종잣돈 20,000,000원 확보", "스펙 보너스는 없지만 출발 현금이 두둑합니다"],
                 source:"통계청 가계금융복지조사 — 20대 가구 평균 금융자산 참고" }; } },
           ...(S.flags.track==="study" ? [
           { t:"회계사(CPA) 시험 준비", d:"재학 중 CPA 준비에 들어갑니다. 합격 판정은 26세 첫 직장 단계에서 합니다 (합격 확률 약 30%, 게임용 단순화).", tag:"전문직 트랙",
@@ -1517,39 +1532,20 @@
             est: (S.flags.sportsAce ? "스타 약 3% · 프로 데뷔 약 30%" : "스타 약 2% · 프로 데뷔 약 18%") + (S.flags.sportsSteady ? " + 학업 병행 보너스 5%p" : "") + " (게임용 단순화)",
             apply(){ const roll = Math.random(); const starP = S.flags.sportsAce ? 0.03 : 0.02, proP = (S.flags.sportsAce ? 0.30 : 0.18) + (S.flags.sportsSteady ? 0.05 : 0);
               if (roll < starP){ S.flags.sportStar = true;
-                return { lines:["전국구 스타로 데뷔! 26세 첫 직장 단계에서 스타 선수 커리어가 열립니다", "단, 선수 수명은 짧아 30대 중반 이후 지도자로 전향합니다"], source:"스포츠 스타 도달 확률은 게임용으로 1~3%로 단순화" }; }
+                return { lines:["전국구 스타로 데뷔! 26세 첫 직장 단계에서 스타 선수 커리어가 열립니다", "단, 선수 수명은 짧아 30대 중반 이후 지도자로 전향합니다"], source:"스포츠 스타 도달 확률은 게임용으로 1~3%로 단순화",
+                  prob:{ name:"프로 선수 도전", probText:"스타 확률 약 " + Math.round(starP*100) + "% · 프로 데뷔 확률 약 " + Math.round(proP*100) + "%", success:true, resultText:"스타 데뷔 성공", nextText:"다음 전개 — 전국구 스타로 데뷔합니다. 26세 첫 직장 단계에서 스타 선수 커리어가 열립니다." } }; }
               if (roll < starP + proP){ S.flags.proAthlete = true;
-                return { lines:["프로 데뷔 성공 — 1군 로스터에 이름을 올렸습니다", "선수 수명은 30대 초중반까지, 이후 지도자·트레이너로 전향합니다"], source:"프로 선수 평균 커리어 기간 참고 (게임용 단순화)" }; }
+                return { lines:["프로 데뷔 성공 — 1군 로스터에 이름을 올렸습니다", "선수 수명은 30대 초중반까지, 이후 지도자·트레이너로 전향합니다"], source:"프로 선수 평균 커리어 기간 참고 (게임용 단순화)",
+                  prob:{ name:"프로 선수 도전", probText:"스타 확률 약 " + Math.round(starP*100) + "% · 프로 데뷔 확률 약 " + Math.round(proP*100) + "%", success:true, resultText:"프로 데뷔 성공", nextText:"다음 전개 — 프로팀 1군 로스터에 오릅니다. 26세 첫 직장 단계에서 프로 선수 커리어가 열립니다." } }; }
               S.flags.sportsCoach = true;
-              return { lines:["프로 데뷔는 불발 — 체육 지도자·트레이너 진로로 진행합니다", "26세 첫 직장 단계에서 체육 관련 직업이 열립니다"], source:"체육 특기생 진로 분포 참고 (게임용 단순화)" }; } },
+              return { lines:["프로 데뷔는 불발 — 체육 지도자·트레이너 진로로 진행합니다", "26세 첫 직장 단계에서 체육 관련 직업이 열립니다"], source:"체육 특기생 진로 분포 참고 (게임용 단순화)",
+                prob:{ name:"프로 선수 도전", probText:"스타 확률 약 " + Math.round(starP*100) + "% · 프로 데뷔 확률 약 " + Math.round(proP*100) + "%", success:false, resultText:"프로 데뷔 실패", nextText:"다음 전개 — 체육 지도자·트레이너 진로로 진행합니다. 26세 첫 직장 단계에서 체육 관련 직업이 열립니다." } }; } },
           ] : []),
           ...(S.flags.proGamer ? [
           { t:"프로 커리어 — 전성기 시즌", d:"20대 초반은 프로게이머의 전성기. 재계약과 대회 상금으로 커리어 수입이 가장 큰 구간입니다.", tag:"프로 활동",
             apply(){ const pay = S.flags.proGamer === "star" ? 6000 : 2200; S.cash += pay;
               S.salary = Math.round(profIncome(S.flags.proGamer === "star" ? "gamerStar" : "gamerPro", curYear()));
-              return { lines:[`프로 활동 수입 ${fmt(pay)} 확보 (연봉·상금 합산 근사)`, `프로 활동 연 소득 ${fmt(S.salary)} 반영 — 집 사고팔기(지도)가 열린 상태가 유지됩니다`, "25세에도 프로 활동이 이어지고, 26세 정식 커리어로 연결됩니다"], source:"프로게이머 연봉·상금 분포 참고 (게임용 근사)" }; } },
-          ] : []),
-        ]},
-      { age:25, title:"취업 준비, 어느 문을 두드릴까", kicker:"25세 · 취업 준비",
-        desc:()=>"졸업이 다가옵니다. 1년의 준비 방향이 26세 첫 직장의 선택지와 연봉을 바꿉니다.",
-        choices:()=>[
-          { t:"공기업 · 공공기관 준비", d:"NCS와 전공 시험을 준비합니다. 공기업 취업 시 초임 보너스가 붙습니다.", tag:"안정",
-            apply(){ S.flags.prepPublic = true; S.cash -= 150;
-              return { lines:["준비 비용 1,500,000원 지출", "공기업 첫 직장 선택 시 초임 +5% 보너스"], source:"공공기관 경영정보공개(알리오) — NCS 기반 채용 구조" }; } },
-          { t:"대기업 공채 준비", d:"인적성과 면접을 집중 준비합니다. 대기업 합격 시 초임 보너스가 붙습니다.", tag:"공채",
-            apply(){ S.flags.prepBig = true; S.cash -= 150;
-              return { lines:["준비 비용 1,500,000원 지출", "대기업 첫 직장 선택 시 초임 +4% 보너스"], source:"고용노동부 채용동향조사 — 대기업 공채 구조" }; } },
-          { t:"공무원 시험 준비", d:"학원비 200만원을 쓰고 9급 공무원에 도전합니다. 26세 단계에서 공무원 선택지가 열립니다.", tag:"공무원",
-            apply(){ S.flags.civilTrack = true; S.cash -= 200;
-              return { lines:["준비 비용 2,000,000원 지출", "26세 첫 직장 단계에서 공무원 선택지가 열립니다"], source:"인사혁신처 — 국가공무원 9급 공채 구조" }; } },
-          { t:"바로 취업 · 경력 선행", d:"준비 기간 없이 중소·중견 현장에 먼저 들어갑니다. 실무 경력이 스펙이 됩니다.", tag:"선취업",
-            apply(){ S.flags.intern = true; S.cash += 300;
-              return { lines:["조기 취업으로 현금 3,000,000원 확보, 실무 경력 보너스"], source:"통계청 경제활동인구조사 — 조기 취업자의 경력 선행 효과" }; } },
-          ...(S.flags.proGamer ? [
-          { t:"프로 커리어 — 마지막 전성기 계약", d:"은퇴가 가까워지는 나이. 대형 계약과 상금으로 선수 생활 수입을 마무리합니다.", tag:"프로 활동",
-            apply(){ const pay = S.flags.proGamer === "star" ? 7000 : 2600; S.cash += pay;
-              S.salary = Math.round(profIncome(S.flags.proGamer === "star" ? "gamerStar" : "gamerPro", curYear()));
-              return { lines:[`프로 활동 수입 ${fmt(pay)} 확보 (연봉·상금 합산 근사)`, `프로 활동 연 소득 ${fmt(S.salary)} 반영 — 집 사고팔기(지도)가 열린 상태가 유지됩니다`, "26세 첫 직장 단계에서 프로게이머 커리어가 정식 연봉으로 이어집니다"], source:"프로게이머 연봉·상금 분포 참고 (게임용 근사)" }; } },
+              return { lines:[`프로 활동 수입 ${fmt(pay)} 확보 (연봉·상금 합산 근사)`, `프로 활동 연 소득 ${fmt(S.salary)} 반영 — 집 사고팔기(지도)가 열린 상태가 유지됩니다`, "26세 첫 직장 단계에서 정식 커리어로 연결됩니다"], source:"프로게이머 연봉·상금 분포 참고 (게임용 근사)" }; } },
           ] : []),
         ]},
       { age:26, title:"첫 직장", kicker:"26세 · 사회초년생",
@@ -1569,18 +1565,23 @@
             pre.push({ t:"로스쿨 도전", d:"입학 확률 약 20% (평균 경쟁률 약 5.6:1), 붙으면 변호사시험 합격 확률 약 50%입니다. 어느 단계에서 실패해도 일반 기업 취업으로 진행합니다.", tag:"전문직 · 확률 도전",
               est:"입학 약 20% × 변호사시험 약 50% (게임용 단순화)",
               apply(){ if (Math.random() >= 0.20){ S.job="mid"; S.salary = Math.round(base*0.65);
-                  return { lines:["로스쿨 입학 불발 — 일반 기업 취업으로 진행합니다", `연봉 ${fmt(S.salary)}으로 시작`], source:"법학전문대학원협의회 — 2024 로스쿨 평균 경쟁률 약 5.6:1 (게임용으로 입학 확률 20%로 단순화)" }; }
+                  return { lines:["로스쿨 입학 불발 — 일반 기업 취업으로 진행합니다", `연봉 ${fmt(S.salary)}으로 시작`], source:"법학전문대학원협의회 — 2024 로스쿨 평균 경쟁률 약 5.6:1 (게임용으로 입학 확률 20%로 단순화)",
+                    prob:{ name:"로스쿨 도전", probText:"입학 확률 약 20%", success:false, resultText:"입학 불합격", nextText:"다음 전개 — 일반 기업 취업으로 진행합니다. 다른 전문직 경로와 일반 취업 선택지는 그대로 남아 있습니다." } }; }
                 if (Math.random() >= 0.50){ S.job="mid"; S.salary = Math.round(base*0.7);
-                  return { lines:["로스쿨은 졸업했지만 변호사시험에서 고배 — 일반 취업으로 진행합니다", `연봉 ${fmt(S.salary)}으로 시작`], source:"법무부 — 변호사시험 합격률 2024년 53.0%, 2025년 52.28% (게임용으로 50%로 단순화)" }; }
+                  return { lines:["로스쿨은 졸업했지만 변호사시험에서 고배 — 일반 취업으로 진행합니다", `연봉 ${fmt(S.salary)}으로 시작`], source:"법무부 — 변호사시험 합격률 2024년 53.0%, 2025년 52.28% (게임용으로 50%로 단순화)",
+                    prob:{ name:"변호사시험", probText:"합격 확률 약 50% (로스쿨 입학 확률 약 20% 통과 후)", success:false, resultText:"불합격", nextText:"다음 전개 — 로스쿨은 졸업했지만 변호사시험에서 떨어져 일반 취업으로 진행합니다." } }; }
                 S.job="lawyer"; S.salary = Math.round(profIncome("lawyer", curYear()) * 0.30);
-                return { lines:["로스쿨 입학 + 변호사시험 합격 — 변호사로 개업합니다", `초반 연 소득 ${fmt(S.salary)} 수준으로 시작 — 주니어 구간이라 평균보다 낮고, 경력이 쌓이는 32세 무렵 국세청 평균 사업소득 수준으로 오릅니다`], source:"국세청 2024년 귀속 종합소득세 — 개인사업자 평균 사업소득 변호사 1억 600만원 (연도별 스케일링, 주니어 기간은 감액해 단순화)" }; } });
+                return { lines:["로스쿨 입학 + 변호사시험 합격 — 변호사로 개업합니다", `초반 연 소득 ${fmt(S.salary)} 수준으로 시작 — 주니어 구간이라 평균보다 낮고, 경력이 쌓이는 32세 무렵 국세청 평균 사업소득 수준으로 오릅니다`], source:"국세청 2024년 귀속 종합소득세 — 개인사업자 평균 사업소득 변호사 1억 600만원 (연도별 스케일링, 주니어 기간은 감액해 단순화)",
+                  prob:{ name:"로스쿨 · 변호사시험 도전", probText:"입학 확률 약 20% × 변호사시험 합격 확률 약 50%", success:true, resultText:"최종 합격", nextText:"다음 전개 — 변호사로 개업합니다. 주니어 기간을 거쳐 32세 무렵 국세청 평균 사업소득 수준으로 오릅니다." } }; } });
           }
           if (S.flags.cpaTrack){
             pre.push({ t:"회계사 도전", d:"CPA 최종 합격에 도전합니다. 합격 확률 약 30% (게임용 단순화). 실패하면 일반 기업 취업으로 진행합니다.", tag:"전문직 · 확률 도전",
               apply(){ if (Math.random() < 0.30){ S.job="accountant"; S.salary = Math.round(profIncome("accountant", curYear()) * 0.35);
-                  return { lines:["CPA 합격 — 회계법인에 입사합니다", `주니어 연봉 ${fmt(S.salary)} 수준으로 시작 — 시니어로 올라서는 32세 무렵 평균 수준으로 오릅니다`], source:"회계법인 회계사 평균 연봉 분포 참고 (게임용 근사, 연도별 스케일링, 주니어 기간은 감액해 단순화)" }; }
+                  return { lines:["CPA 합격 — 회계법인에 입사합니다", `주니어 연봉 ${fmt(S.salary)} 수준으로 시작 — 시니어로 올라서는 32세 무렵 평균 수준으로 오릅니다`], source:"회계법인 회계사 평균 연봉 분포 참고 (게임용 근사, 연도별 스케일링, 주니어 기간은 감액해 단순화)",
+                    prob:{ name:"회계사(CPA) 도전", probText:"합격 확률 약 30%", success:true, resultText:"합격", nextText:"다음 전개 — 회계법인에 입사합니다. 32세 시니어 승급 시 평균 수준으로 오릅니다." } }; }
                 S.job="mid"; S.salary = Math.round(base*0.68);
-                return { lines:["CPA 도전은 불발 — 일반 기업 취업으로 진행합니다", `연봉 ${fmt(S.salary)}으로 시작`], source:"금융감독원 공인회계사 시험 구조 참고 (합격 확률은 게임용으로 30%로 단순화)" }; } });
+                return { lines:["CPA 도전은 불발 — 일반 기업 취업으로 진행합니다", `연봉 ${fmt(S.salary)}으로 시작`], source:"금융감독원 공인회계사 시험 구조 참고 (합격 확률은 게임용으로 30%로 단순화)",
+                  prob:{ name:"회계사(CPA) 도전", probText:"합격 확률 약 30%", success:false, resultText:"불합격", nextText:"다음 전개 — 일반 기업 취업으로 진행합니다." } }; } });
           }
           if (S.flags.civilTrack){
             pre.push({ t:"공무원 — 9급 행정직", d:"준비해 온 공무원 시험에 합격했습니다. 연봉은 낮지만 정년이 보장되고 연금이 탄탄합니다.", tag:"안정",
@@ -1648,84 +1649,28 @@
         choices:()=>[
           { t:"결혼 — 맞벌이 가구 출발", d:"결혼 비용 약 3,200만원(주택 제외). 배우자의 종잣돈이 합쳐지고 가구 저축 여력이 1.5배가 됩니다.", tag:"청약 가점 +",
             apply(){ S.cash -= 3200; S.married = true; S.kids = 1; const spouse = Math.round(S.salary*0.5); S.cash += spouse;
-              return { lines:["결혼 비용 32,000,000원 지출", `배우자가 모아온 종잣돈 ${fmt(spouse)} 합산`, "맞벌이 효과: 매년 저축 여력 ×1.5", "청약 부양가족 가점 확보, 자녀 1명"],
+              return { lines:["결혼 비용 32,000,000원 지출", `배우자가 모아온 종잣돈 ${fmt(spouse)} 합산`, "맞벌이 효과: 매년 저축 여력 ×1.5", "청약 부양가족 가점 확보, 자녀 1명 (32세부터 돌봄비 · 36세부터 교육비가 연도 정산에 자동 반영됩니다)"],
                 source:"결혼정보회사·통계청 — 평균 결혼비용(주택 제외) 약 3,000만원대, 가계금융복지조사 맞벌이가구 소득" }; } },
-          { t:"스몰웨딩 — 실속 결혼", d:"900만원으로 간소하게. 맞벌이 효과와 배우자 종잣돈 합산은 그대로 가져갑니다.", tag:"실속",
-            apply(){ S.cash -= 900; S.married = true; S.kids = 1; const spouse = Math.round(S.salary*0.5); S.cash += spouse;
-              return { lines:["결혼 비용 9,000,000원 지출", `배우자가 모아온 종잣돈 ${fmt(spouse)} 합산`, "맞벌이 효과: 매년 저축 여력 ×1.5", "청약 부양가족 가점 확보, 자녀 1명"],
+          { t:"스몰웨딩 — 실속 결혼", d:"1,000만원으로 간소하게. 맞벌이 효과와 배우자 종잣돈 합산은 그대로 가져갑니다.", tag:"실속",
+            apply(){ S.cash -= 1000; S.married = true; S.kids = 1; const spouse = Math.round(S.salary*0.5); S.cash += spouse;
+              return { lines:["결혼 비용 10,000,000원 지출", `배우자가 모아온 종잣돈 ${fmt(spouse)} 합산`, "맞벌이 효과: 매년 저축 여력 ×1.5", "청약 부양가족 가점 확보, 자녀 1명 (32세부터 돌봄비 · 36세부터 교육비가 연도 정산에 자동 반영됩니다)"],
                 source:"통계청 사회조사 — 간소한 결혼 문화 확산, 비용 절감분은 자산으로 전환" }; } },
           { t:"비혼 — 1인 가구 유지", d:"결혼 비용이 없고 저축률이 오릅니다. 대신 청약 부양가족 가점과 맞벌이 소득이 없습니다.",
             apply(){ S.saveRate += 0.05;
               return { lines:["저축률 +5%p (1인 가구 고정비 절감)", "청약 가점은 무주택기간·통장만으로 쌓아야 합니다"],
                 source:"통계청 인구총조사 — 1인 가구 비중 2023년 35.5%" }; } },
         ]},
-      { age:33, title:"첫아이, 육아의 시작", kicker:"33세 · 육아",
-        desc:()=> S.kids > 0 ? "첫아이가 태어났습니다. 돌봄 방식을 정하는 일이 곧 가계 구조를 정하는 일이 됩니다." : "아이는 없지만, 가족과 커리어의 무게중심이 옮겨가는 시기입니다.",
-        choices:()=> S.kids > 0 ? [
-          { t:"맞벌이 유지 + 돌봄 서비스", d:"연 600만원의 돌봄 비용을 38세까지 냅니다. 커리어와 소득은 유지됩니다.", tag:"맞벌이",
-            apply(){ S.childCostUntil = 38;
-              return { lines:["38세까지 연 6,000,000원 돌봄 비용 발생 (정산에 반영)", "맞벌이 소득 구조는 유지됩니다"], source:"육아정책연구소·통계청 — 영유아 돌봄·보육 비용 대표값 근사" }; } },
-          { t:"1년 육아휴직", d:"34세 1년간 저축 여력이 크게 줄어듭니다. 대신 아이와의 시간과 이후 커리어 복귀를 지킵니다.", tag:"휴직",
-            apply(){ S.flags.careLeave = true;
-              return { lines:["육아휴직 1년 — 34세 구간의 저축 여력이 40% 수준으로 줄어듭니다 (정산에 반영)", "복직 후 커리어는 유지됩니다"], source:"고용보험 육아휴직급여 제도 — 통상임금의 80% 수준(상한 존재)을 게임용으로 단순화" }; } },
-          { t:"조부모 도움 + 감사 지원", d:"가족의 도움을 받아 돌봄 비용을 줄입니다. 지원·감사로 현금 200만원을 씁니다.", tag:"가족",
-            apply(){ S.cash -= 200;
-              return { lines:["현금 2,000,000원 지출, 돌봄 비용은 들지 않습니다", "가족 네트워크가 자산이 되는 선택입니다"], source:"통계청 가계금융복지조사 — 가구 간 이전지출 항목 참고" }; } },
-        ] : [
-          { t:"부모님 건강 챙기기", d:"현금 300만원으로 부모님 건강검진과 생활 지원을 시작합니다.",
-            apply(){ S.cash -= 300;
-              return { lines:["현금 3,000,000원 지출 — 부모님 건강 지원"], source:"통계청 가계금융복지조사 — 이전지출 항목 참고" }; } },
-          { t:"커리어 투자 — 자격·네트워크", d:"현금 400만원을 씁니다. 42세 커리어 전환 때 이직 보너스가 붙습니다.", tag:"투자",
-            apply(){ S.cash -= 400; S.flags.jumpReady = true;
-              return { lines:["현금 4,000,000원 지출", "42세 커리어 전환·44세 이직에서 보너스가 붙습니다"], source:"게임용 단순화 — 경력 투자의 이직 효과" }; } },
-          { t:"저축 가속", d:"지출을 줄여 저축률을 3%p 올립니다. 집 마련이 빨라집니다.", tag:"저축",
-            apply(){ S.saveRate += 0.03;
-              return { lines:["저축률 +3%p"], source:"게임용 단순화" }; } },
-        ]},
       { age:34, type:"housing", round:1 },
-      { age:36, title:"자녀 교육, 어디까지 쓸 것인가", kicker:"36세 · 자녀 교육",
-        desc:()=> S.kids > 0 ? "아이가 초등학교에 들어갑니다. 사교육에 얼마나 쓸지가 앞으로 10년의 저축 속도를 정합니다." : "자녀 교육비 대신 다른 곳에 무게를 둘 수 있는 시기입니다.",
-        choices:()=> S.kids > 0 ? [
-          { t:"교육에 집중", d:"44세까지 연 900만원을 사교육에 씁니다. 저축이 그만큼 줄어듭니다.", tag:"교육",
-            apply(){ S.eduSpendUntil = 44;
-              return { lines:["44세까지 연 9,000,000원 교육 지출 (정산에 반영)"], source:"통계청 사교육비조사 — 초·중학생 1인당 월평균 사교육비 흐름 근사" }; } },
-          { t:"교육과 저축 균형", d:"40세까지만 연 900만원 수준으로 쓰고, 이후에는 저축으로 돌립니다.", tag:"균형",
-            apply(){ S.eduSpendUntil = 40;
-              return { lines:["40세까지 연 9,000,000원 교육 지출 (정산에 반영)", "이후 저축 속도가 회복됩니다"], source:"통계청 사교육비조사 참고" }; } },
-          { t:"저축 우선 · 공교육 중심", d:"사교육을 최소화하고 저축률을 2%p 올립니다.", tag:"저축",
-            apply(){ S.saveRate += 0.02;
-              return { lines:["저축률 +2%p", "교육비는 공교육 중심으로 유지합니다"], source:"통계청 사교육비조사 — 사교육 미참여 가구 비중 참고" }; } },
-        ] : [
-          { t:"부모 부양 시작", d:"42세까지 연 600만원의 부양 비용을 감당합니다.", tag:"가족",
-            apply(){ S.childCostUntil = 42;
-              return { lines:["42세까지 연 6,000,000원 부양 지출 (정산에 반영)"], source:"통계청 가계금융복지조사 — 이전지출 항목 참고" }; } },
-          { t:"노후 저축 집중", d:"교육비가 없는 만큼 저축률을 3%p 올립니다.", tag:"저축",
-            apply(){ S.saveRate += 0.03;
-              return { lines:["저축률 +3%p"], source:"게임용 단순화" }; } },
-          { t:"부업 · 자기계발", d:"초기 비용 200만원을 쓰고 45세까지 연 250만원의 부업 소득을 만듭니다.", tag:"부업",
-            apply(){ S.cash -= 200; S.sideIncome = 250; S.sideIncomeUntil = 45;
-              return { lines:["현금 2,000,000원 지출", "45세까지 연 2,500,000원 부업 소득 (정산에 반영)"], source:"통계청 — 부업 종사 가구 소득 항목 참고 (게임용 근사)" }; } },
-        ]},
       { age:39, type:"housing", round:2 },
-      { age:42, title:"커리어 전환, 한 번 더 갈아탈까", kicker:"42세 · 커리어 전환",
-        desc:()=>`연봉 ${fmt(S.salary)}의 40대 초반. 남은 커리어는 약 18년 — 지금의 준비가 44세 점프의 크기를 정합니다.`,
-        choices:()=>[
-          { t:"이직 준비 — 시장가치 점검", d:"네트워크와 포트폴리오를 정비합니다. 44세 이직 선택 시 연봉 상승폭이 커집니다.", tag:"이직",
-            apply(){ S.flags.jumpReady = true;
-              return { lines:["이직 준비 완료 — 44세 이직 시 연봉 상승폭 +5%p 보너스"], source:"게임용 단순화 — 사전 준비의 이직 효과" }; } },
-          { t:"대학원 · 자격증으로 전문성", d:"현금 1,200만원을 씁니다. 전문성이 붙어 연봉이 즉시 8% 오릅니다.", tag:"전문성",
-            apply(){ S.cash -= 1200; const before = S.salary; S.salary = Math.round(S.salary*1.08);
-              return { lines:["현금 12,000,000원 지출", `연봉 ${fmt(before)} → ${fmt(S.salary)}`], source:"고용노동부 — 학위·자격 보유자의 임금 프리미엄 참고" }; } },
-          { t:"부업 시작", d:"초기 비용 100만원을 쓰고 52세까지 연 300만원의 부업 소득을 만듭니다.", tag:"부업",
-            apply(){ S.cash -= 100; S.sideIncome = 300; S.sideIncomeUntil = 52;
-              return { lines:["현금 1,000,000원 지출", "52세까지 연 3,000,000원 부업 소득 (정산에 반영)"], source:"통계청 — 부업 종사 가구 소득 항목 참고 (게임용 근사)" }; } },
-          { t:"현직 집중", d:"아무것도 바꾸지 않고 저축률을 2%p 올립니다.", tag:"안정",
-            apply(){ S.saveRate += 0.02;
-              return { lines:["저축률 +2%p"], source:"게임용 단순화" }; } },
-        ]},
       { age:44, title:"커리어의 점프", kicker:"44세 · 중년의 갈림길",
         desc:()=>`연봉 ${fmt(S.salary)}의 중년. ${curYear()}년 실업률 ${macro(curYear()).unemp}%의 시장에서 승부를 걸까요?`,
         choices:()=>[
+          { t:"대학원 · 자격증으로 전문성", d:"현금 1,200만원을 씁니다. 전문성이 붙어 연봉이 즉시 8% 오릅니다.", tag:"전문성",
+            apply(){ S.cash -= 1200; const before = S.salary; S.salary = Math.round(S.salary*1.08);
+              return { lines:["현금 12,000,000원 지출", `연봉 ${fmt(before)} → ${fmt(S.salary)}`], source:"고용노동부 — 학위·자격 보유자의 임금 프리미엄 참고" }; } },
+          { t:"부업 시작", d:"초기 비용 1,000만원을 쓰고 52세까지 연 1,000만원의 부업 소득을 만듭니다.", tag:"부업",
+            apply(){ S.cash -= 1000; S.sideIncome = 1000; S.sideIncomeUntil = 52;
+              return { lines:["현금 10,000,000원 지출", "52세까지 연 10,000,000원 부업 소득 (정산에 반영)"], source:"통계청 — 부업 종사 가구 소득 항목 참고 (게임용 근사)" }; } },
           { t:"이직으로 점프", d:"연봉 +22%. 중견 출신이라면 대기업으로의 반전도 가능합니다.", 
             apply(){ const before = S.salary; S.salary = Math.round(S.salary * (S.job==="mid" ? 1.3 : 1.22) * ((S.flags.jumpReady || S.flags.network) ? 1.05 : 1));
               return { lines:[`연봉 ${fmt(before)} → ${fmt(S.salary)}`, "남은 16년의 소득 궤적이 통째로 올라갑니다"],
@@ -1736,35 +1681,28 @@
           { t:"창업 도전", d:"퇴직금 중간정산 4,000만원을 종잣돈으로. 성공하면 소득 1.7배, 실패하면 2년을 잃습니다.", tag:"고위험",
             apply(){ S.cash -= 4000; const win = S.flags.stockOption ? Math.random()<0.6 : Math.random()<0.45;
               if (win){ S.salary = Math.round(S.salary*1.7);
-                return { lines:["창업 성공 — 사업이 궤도에 올랐습니다", `소득 ${fmt(S.salary)} 수준으로 상승`, S.flags.stockOption?"스타트업 경험이 여기서 빛났습니다":""], source:"중소벤처기업부 창업기업실태조사 — 5년 생존율 약 33%이나 성공 시 소득 상승폭 큼" }; }
+                return { lines:["창업 성공 — 사업이 궤도에 올랐습니다", `소득 ${fmt(S.salary)} 수준으로 상승`, S.flags.stockOption?"스타트업 경험이 여기서 빛났습니다":""], source:"중소벤처기업부 창업기업실태조사 — 5년 생존율 약 33%이나 성공 시 소득 상승폭 큼",
+                  prob:{ name:"창업 도전", probText:"성공 확률 약 " + (S.flags.stockOption ? 60 : 45) + "%", success:true, resultText:"창업 성공", nextText:"다음 전개 — 사업이 궤도에 올라 소득이 1.7배 수준으로 오릅니다." } }; }
               S.salary = Math.round(S.salary*0.72); S.cash -= 1500;
-              return { lines:["창업 실패 — 재취업까지 시간이 걸렸습니다", `연봉 ${fmt(S.salary)}으로 하락, 추가 손실 15,000,000원`], source:"중소벤처기업부 — 창업 5년 내 폐업률 약 67%" }; } },
+              return { lines:["창업 실패 — 재취업까지 시간이 걸렸습니다", `연봉 ${fmt(S.salary)}으로 하락, 추가 손실 15,000,000원`], source:"중소벤처기업부 — 창업 5년 내 폐업률 약 67%",
+                prob:{ name:"창업 도전", probText:"성공 확률 약 " + (S.flags.stockOption ? 60 : 45) + "%", success:false, resultText:"창업 실패", nextText:"다음 전개 — 재취업으로 돌아가 연봉이 하락하고 추가 손실이 발생합니다." } }; } },
           ...(S.flags.stockOption ? [{ t:"스톡옵션 행사", d:"다니던 스타트업이 상장·인수됩니다. 옵션을 현금화합니다.", tag:"보너스",
             apply(){ const gain = 6000 + Math.round(Math.random()*9000); S.cash += gain; S.flags.stockOption = false;
               return { lines:[`스톡옵션 차익 ${fmt(gain)} 확보`, "내 집 마련 2막의 실탄이 됩니다"], source:"스타트업 지분 보상 사례 기반 근사 (상장·M&A 시 행사 가정)" }; } }] : []),
         ]},
-      { age:47, title:"노후 준비, 연금과 건강", kicker:"47세 · 노후 준비",
-        desc:()=>"은퇴가 13년 앞으로 다가왔습니다. 연금과 건강, 부모 부양 사이에서 무게를 정합니다.",
+      { age:49, title:"돈이 새는 곳, 노후냐 교육이냐", kicker:"49세 · 자산 재배분",
+        desc:()=>"자녀 교육비와 노후 준비가 동시에 몰리는 나이. 무엇에 무게를 두시겠습니까?",
         choices:()=>[
+          ...(S.kids>0 ? [{ t:"자녀 교육에 집중", d:"6년간 연 1,000만원을 사교육·유학 준비에 씁니다. 저축이 그만큼 줄어듭니다.",
+            apply(){ S.eduSpendUntil = 55;
+              return { lines:["55세까지 연 10,000,000원 교육 지출", "대신 노후 자산 형성 속도는 느려집니다"],
+                source:"통계청 사교육비조사 — 고교생 1인당 월평균 사교육비 약 60만원(2024)" }; } }] : []),
           { t:"연금저축 · IRP 시작", d:"현금의 20%를 연금계좌로 옮겨 세액공제와 과세이연 효과를 챙깁니다.", tag:"절세",
             apply(){ const mv = Math.round(S.cash*0.2); S.cash -= mv; S.pensionBoost = (S.pensionBoost||0) + Math.round(mv*1.12);
               return { lines:[`${fmt(mv)}을 연금계좌로 이전, 세액공제·과세이연 효과 +12% 반영`, "은퇴 정산의 연금 자산으로 합산됩니다"], source:"국세청 — 연금계좌 세액공제율 13.2–16.5%, 과세이연 효과" }; } },
-          { t:"건강 투자 — 검진 · 운동", d:"현금 400만원을 건강에 씁니다. 은퇴 후 의료비 부담을 줄이는 투자입니다.", tag:"건강",
-            apply(){ S.cash -= 400; S.flags.healthy = true;
-              return { lines:["현금 4,000,000원 지출 — 건강검진·운동 루틴 정착", "숫자로 바로 남지 않지만 은퇴 후 삶의 질을 지킵니다"], source:"국민건강보험공단 — 연령대별 의료비 지출 흐름 참고" }; } },
-          { t:"부모 부양 본격화", d:"52세까지 연 600만원의 부양 비용을 감당합니다.", tag:"가족",
-            apply(){ S.childCostUntil = 52;
-              return { lines:["52세까지 연 6,000,000원 부양 지출 (정산에 반영)"], source:"통계청 가계금융복지조사 — 이전지출 항목 참고" }; } },
-          { t:"현상 유지", d:"아무것도 바꾸지 않습니다.",
-            apply(){ return { lines:["포트폴리오 유지"], source:"—" }; } },
-        ]},
-      { age:49, title:"돈이 새는 곳, 노후냐 교육이냐", kicker:"49세 · 자산 재배분",
-        desc:()=>"자녀 교육비와 부모 부양, 노후 준비가 동시에 몰리는 나이. 무엇에 무게를 두시겠습니까?",
-        choices:()=>[
-          ...(S.kids>0 ? [{ t:"자녀 교육에 집중", d:"6년간 연 900만원을 사교육·유학 준비에 씁니다. 저축이 그만큼 줄어듭니다.",
-            apply(){ S.eduSpendUntil = 55;
-              return { lines:["55세까지 연 9,000,000원 교육 지출", "대신 노후 자산 형성 속도는 느려집니다"],
-                source:"통계청 사교육비조사 — 고교생 1인당 월평균 사교육비 약 60만원(2024)" }; } }] : []),
+          { t:"건강 투자 — 검진 · 운동", d:"현금 1,000만원을 건강에 씁니다. 은퇴 후 의료비 부담을 줄이는 투자입니다.", tag:"건강",
+            apply(){ S.cash -= 1000; S.flags.healthy = true;
+              return { lines:["현금 10,000,000원 지출 — 건강검진·운동 루틴 정착", "숫자로 바로 남지 않지만 은퇴 후 삶의 질을 지킵니다"], source:"국민건강보험공단 — 연령대별 의료비 지출 흐름 참고" }; } },
           { t:"노후 투자 확대", d:"저축의 85%를 ETF 투자로 돌립니다. 다음 화면에서 나스닥·코스닥·채권·금 중 하나를 한 번 더 고릅니다. 은퇴까지 11년, 복리의 마지막 구간입니다.", tag:"공격 전환", sub:"etf",
             apply(pid){ S.allocInv = 0.85; if (pid) S.invProduct = pid; S.speculative = false;
               return { lines:["투자 비중 85%로 상향", `수익은 남은 기간 ${productLabel(S.invProduct)}의 연도별 실제 수익률을 탑니다`, "다음 단계 정산 로그에 상품·연도별로 표시됩니다"], source: PRODUCTS[S.invProduct].src + " — 연도별 실제 수익률을 게임 내 정산에 직접 사용" }; } },
@@ -1777,27 +1715,18 @@
               S.extraProp = { buyPrice: price, buyYear: curYear() };
               return { lines:[`일산 소형 아파트 ${fmt(price)}에 매수, 전세 ${fmt(jeonseCover)}를 끼고 실투자 ${fmt(need)}`, "은퇴 시점까지 연 2.6% 상승 가정으로 보유합니다"],
                 source:"국토교통부 실거래가 공개시스템 — 고양시 소형 아파트 전세가율 약 62% 근사" }; } },
-          { t:"부모 부양 · 가족에 집중", d:"연 500만원의 부양 비용을 감당합니다. 자산은 줄지만 후회는 없습니다.",
-            apply(){ S.eduSpendUntil = 55; S.flags.familyFirst = true;
-              return { lines:["55세까지 연 5,000,000원 수준의 부양 지출 (정산에 반영)", "숫자로 남지 않는 선택입니다"], source:"통계청 가계금융복지조사 — 이전지출 항목 참고" }; } },
         ]},
-      { age:52, title:"은퇴 준비, 마지막 정리", kicker:"52세 · 은퇴 준비",
-        desc:()=>"은퇴까지 8년. 연금 수령 구조와 은퇴 후 소득을 미리 정리합니다.",
+      { age:55, title:"은퇴 설계, 마지막 카드", kicker:"55세 · 은퇴 준비",
+        desc:()=>"은퇴까지 5년. 연금 수령 구조와 집을 어떻게 정리하느냐가 최종 자산의 모양을 정합니다.",
         choices:()=>[
           { t:"연금 수령 전략 확정", d:"현금의 30%를 연금계좌로 옮겨 수령 구조를 확정합니다. 과세이연 효과 +10%를 반영합니다.", tag:"연금",
             apply(){ const mv = Math.round(S.cash*0.3); S.cash -= mv; S.pensionBoost = (S.pensionBoost||0) + Math.round(mv*1.10);
               return { lines:[`${fmt(mv)}을 연금계좌로 이전, 과세이연 효과 +10% 반영`, "은퇴 정산의 연금 자산으로 합산됩니다"], source:"국세청 — 연금계좌 과세이연·연금소득세 구조 참고" }; } },
-          { t:"은퇴 후 파트타임 준비", d:"자격과 네트워크를 정비해, 은퇴 전까지 연 350만원의 파트타임·부업 소득을 만듭니다.", tag:"소득",
-            apply(){ S.sideIncome = 350; S.sideIncomeUntil = 60;
-              return { lines:["60세까지 연 3,500,000원 부업·파트타임 소득 (정산에 반영)"], source:"통계청 경제활동인구조사 — 50대 부업·시간제 종사 흐름 참고 (게임용 근사)" }; } },
+          { t:"은퇴 후 파트타임 준비", d:"자격과 네트워크를 정비해, 은퇴 전까지 연 1,000만원의 파트타임·부업 소득을 만듭니다.", tag:"소득",
+            apply(){ S.sideIncome = 1000; S.sideIncomeUntil = 60;
+              return { lines:["60세까지 연 10,000,000원 부업·파트타임 소득 (정산에 반영)"], source:"통계청 경제활동인구조사 — 50대 부업·시간제 종사 흐름 참고 (게임용 근사)" }; } },
           { t:"주거 정리 검토", d:"지금 집과 전세 구조를 점검합니다. 실제 매도·갈아타기는 아래 '집 사고팔기'에서 바로 할 수 있습니다.", tag:"주거",
             apply(){ return { lines:[S.house ? `보유 주택 시가 ${fmt(houseValue())} — 정리는 지도 거래로 진행하세요` : "무주택 상태 — 은퇴 전 주거 안정이 과제입니다"], source:"—" }; } },
-          { t:"현상 유지", d:"아무것도 바꾸지 않습니다.",
-            apply(){ return { lines:["포트폴리오 유지"], source:"—" }; } },
-        ]},
-      { age:55, title:"은퇴 설계, 마지막 카드", kicker:"55세 · 은퇴 준비",
-        desc:()=>"은퇴까지 5년. 집과 연금을 어떻게 정리하느냐가 최종 자산의 모양을 정합니다.",
-        choices:()=>[
           ...(S.house ? [{ t:"다운사이징", d:"지금 집을 팔고 신축 소형으로 옮깁니다. 차액은 현금으로 확보합니다.",
             apply(){ const apt = aptById(S.house.aptId); const sell = houseValue();
               const settle = sell - S.loan; clearMortgage();
@@ -1835,6 +1764,7 @@
       const isEtf = c.sub === "etf";
       const list = isEtf ? ETF_SUB : HIGH_SUB;
       app.innerHTML = `<div class="card fade">
+        <div class="top-back"><button class="btn ghost" id="btnSubBackTop" type="button">← 이전으로 · 다른 선택지 보기</button></div>
         <div class="kicker">${st.kicker} · 세부 선택</div>
         <h2>${isEtf ? "어떤 ETF에 투자할까요?" : "어떤 고위험 자산에 투자할까요?"}</h2>
         <p class="muted" style="text-wrap:pretty">${isEtf
@@ -1855,7 +1785,9 @@
         </div>
       </div>`;
       scrollTop();
+      // 세부 선택은 선택지 안으로 한 뎁스 들어간 화면이라, 확정 전 뒤로가기(상·하단 동일 동작)를 허용한다
       document.getElementById("btnSubBack").onclick = ()=> renderStage();
+      document.getElementById("btnSubBackTop").onclick = ()=> renderStage();
       app.querySelectorAll(".choice[data-p]").forEach(btn=>{
         btn.onclick = ()=>{
           const pid = btn.dataset.p;
@@ -1896,7 +1828,8 @@
        꽝 줄은 산 단계에서만 보이고, 당첨 줄은 이후 단계에서도 계속 보인다 */
     function combinedSettleLines(){
       const lotto = (Array.isArray(S.lottoLog) ? S.lottoLog : []).filter(e => e.stage === S.stageIdx || e.win);
-      return S.settleLog.concat(lotto.map(e => ({ cls:e.cls, text:e.text })));
+      const gamble = (Array.isArray(S.gambleLog) ? S.gambleLog : []).filter(e => e.stage === S.stageIdx || e.win);
+      return S.settleLog.concat(lotto.map(e => ({ cls:e.cls, text:e.text })), gamble.map(e => ({ cls:e.cls, text:e.text })));
     }
     function settleLogHTML(){
       const lines = combinedSettleLines();
@@ -1940,6 +1873,78 @@
       };
     }
 
+    /* ---------- 추가 행동: 강원랜드 도박 (44세 이상 단계에서만, 단계마다 1번) ----------
+       로또와 같은 패턴의 추가 행동이다 — 단계의 본래 선택을 소모하지 않는다.
+       판돈 100만원, 승리 확률 40%, 승리하면 200만원(2배)을 받아 순수익 +100만원.
+       기대값은 한 번에 -20만원이라 장기적으로는 반드시 손해인 구조이며, 그 점을 박스 안내에 명시한다.
+       결과는 즉시 박스에 표시하고, 정산 로그용 기록은 S.gambleLog에 로또와 분리해 남긴다 */
+    const GAMBLE_COST = 1000; // 판돈 100만원 (게임 화폐 단위 만원)
+    const GAMBLE_PRIZE = 2000; // 승리 시 수령 200만원 (2배)
+    const GAMBLE_ODDS = 0.40; // 승리 확률 40%
+    function gambleEntry(){
+      if (!Array.isArray(S.flags.gambleHistory)) return null;
+      return S.flags.gambleHistory.find(e => e.stage === S.stageIdx) || null;
+    }
+    function gambleBoxHTML(){
+      if (S.age < 44) return ""; // 40대 이상 단계(44·49·55세)에서만 열린다
+      const entry = gambleEntry();
+      const canAfford = (S.cash || 0) >= GAMBLE_COST;
+      const body = entry
+        ? (entry.win
+          ? `<p class="lotto-result win">승리! 판돈 ${fmt(GAMBLE_COST)}으로 ${fmt(GAMBLE_PRIZE)}을 받아 순수익 +${fmt(GAMBLE_PRIZE - GAMBLE_COST)}이 현금에 더해졌습니다. 이번 단계에서는 이미 도전했습니다 (단계마다 1번).</p>`
+          : `<p class="lotto-result">패배 — 판돈 ${fmt(GAMBLE_COST)}을 잃었습니다. 이번 단계에서는 이미 도전했습니다 (단계마다 1번).</p>`)
+        : `<p class="small muted" style="margin-top:4px">판돈 ${fmt(GAMBLE_COST)}, 이 단계에서 1번만 도전할 수 있습니다. 승리 확률 40%, 이기면 ${fmt(GAMBLE_PRIZE)}(2배)을 받습니다. 다만 확률상 10번 하면 평균 6번은 잃는 구조라 한 번 기대 손실이 ${fmt(GAMBLE_COST * 0.2)}이고, 카지노 도박은 장기적으로 반드시 손해입니다. 집 마련 자금을 걸기 전에 한 번 더 생각하세요.</p>
+          ${canAfford
+            ? `<button class="btn ghost" id="btnGamble" type="button" style="width:100%;margin-top:12px">강원랜드에서 ${fmt(GAMBLE_COST)} 걸기</button>`
+            : `<button class="btn ghost" id="btnGamble" type="button" style="width:100%;margin-top:12px" disabled>강원랜드에서 ${fmt(GAMBLE_COST)} 걸기</button>
+               <p class="small" style="margin-top:8px;color:var(--up);font-weight:600">현금이 ${fmt(GAMBLE_COST)}보다 적어 지금은 도전할 수 없습니다.</p>`}`;
+      return `<div class="extra-trade lotto">
+          <div class="extra-trade-head"><span class="t">강원랜드 도박</span><span class="tag gold">추가 행동</span></div>
+          ${body}
+        </div>`;
+    }
+    function wireGamble(st, rerender){
+      const b = document.getElementById("btnGamble");
+      if (!b) return;
+      b.onclick = ()=>{
+        if ((S.cash || 0) < GAMBLE_COST) return; // 판돈이 없으면 도전할 수 없다 (버튼도 비활성화돼 있다)
+        S.cash -= GAMBLE_COST;
+        const win = Math.random() < GAMBLE_ODDS;
+        if (!Array.isArray(S.flags.gambleHistory)) S.flags.gambleHistory = [];
+        S.flags.gambleHistory.push({ stage:S.stageIdx, age:S.age, year:curYear(), win });
+        if (!Array.isArray(S.gambleLog)) S.gambleLog = [];
+        S.gambleLog.push(win
+          ? { stage:S.stageIdx, win:true, cls:"good", text:`강원랜드 도박 승리 — 판돈 ${fmt(GAMBLE_COST)}으로 ${fmt(GAMBLE_PRIZE)} 수령, 순수익 +${fmt(GAMBLE_PRIZE - GAMBLE_COST)} (승리 확률 40%)` }
+          : { stage:S.stageIdx, win:false, cls:"bad", text:`강원랜드 도박 패배 — 판돈 ${fmt(GAMBLE_COST)} 손실 (승리 확률 40%, 장기적으로는 손해인 구조)` });
+        if (win) S.cash += GAMBLE_PRIZE;
+        updateHUD();
+        rerender();
+      };
+    }
+
+    /* ---------- 확률 판정 결과 배너 ----------
+       확률 선택지의 apply()가 돌려준 res.prob({name, probText, success, resultText, nextText})를
+       정산 로그와 분리된 전용 카드로 보여준다. 미리보기(renderResult)에서 한 번, 확정 후 다음 단계
+       화면 상단에서 다시 한 번 표시한다 — 다음 단계 표시는 S.lastProb에 stage를 묶어 저장해 두고
+       그 단계 화면에서만 꺼낸다. 성공은 초록(teal)+합격/성공, 실패는 빨강+불합격/실패로 구분한다 */
+    function probBannerHTML(p, locked){
+      if (!p) return "";
+      const ok = !!p.success;
+      return `<div class="prob-banner ${ok ? "ok" : "fail"}" role="status" aria-live="polite">
+        <div class="prob-ico" aria-hidden="true">${ok ? "✓" : "✕"}</div>
+        <div class="prob-body">
+          <div class="prob-head"><span class="prob-badge">${p.resultText}</span><span class="prob-name">${p.name}</span></div>
+          <div class="prob-meta">${p.probText} · 결과: ${p.resultText}</div>
+          <div class="prob-next">${p.nextText}</div>
+          ${locked ? `<div class="prob-lock">확정된 판정입니다 — 이전 단계로 돌아가 다시 굴릴 수 없습니다.</div>` : ""}
+        </div>
+      </div>`;
+    }
+    function stageProbBannerHTML(){
+      return (S.lastProb && S.lastProb.stage === S.stageIdx) ? probBannerHTML(S.lastProb, true) : "";
+    }
+    let pendingHousingProb = null; // 청약 판정 결과 — 주거 미리보기를 거쳐 확정(advance)될 때 S.lastProb으로 넘어간다
+
     function renderStage(){
       destroyActiveMap(); // 지도 화면에서 넘어온 경우 이전 지도 인스턴스를 정리한다
       const st = STAGES[S.stageIdx];
@@ -1950,6 +1955,7 @@
       const shock = shockBanner(S.lastYear, year);
       const settle = settleLogHTML();
       app.innerHTML = `<div class="card fade">
+        ${stageProbBannerHTML()}
         <div class="kicker">${st.kicker} · ${year}년</div>
         <h2>${st.title}</h2>
         ${macroStrip(year)}
@@ -1970,11 +1976,8 @@
             : `아직 집이 없습니다. ${year}년 시세와 ${year}년 대출 규제로, 지도에서 단지를 골라 살 수 있습니다.`}
           거래는 이 단계의 선택과 별개로 진행됩니다 — 거래를 마쳐도 이 화면으로 돌아와 원래 선택을 이어서 고를 수 있습니다.</p>
           <button class="btn ghost" id="btnExtraTrade" type="button" style="width:100%;margin-top:12px">${S.house ? "매도 · 갈아타기 하러 가기" : "지도에서 단지 고르러 가기"}</button>
-        </div>` : `<div class="extra-trade locked">
-          <div class="extra-trade-head"><span class="t">집 사고팔기 (지도)</span><span class="tag">소득 생긴 뒤 열림</span></div>
-          <p class="small muted" style="margin-top:4px">취직해서 소득이 생기면 집을 살 수 있어요. 아직 소득이 없어 주택담보대출을 받을 수 없는 시기라, 첫 소득이 생긴 단계부터 이 화면에서도 언제든 집을 사고팔 수 있습니다.</p>
-        </div>`}
-        ${lottoBoxHTML()}</div>`;
+        </div>` : ``}
+        ${lottoBoxHTML()}${gambleBoxHTML()}</div>`;
       scrollTop();
       app.querySelectorAll(".choice").forEach(btn=>{
         btn.onclick = ()=>{
@@ -1994,11 +1997,14 @@
       const extraBtn = document.getElementById("btnExtraTrade");
       if (extraBtn) extraBtn.onclick = ()=>{ extraTradeSnap = snapshotState(); renderExtraTradeIntro(st); };
       wireLotto(st, ()=> renderStage());
+      wireGamble(st, ()=> renderStage());
     }
 
     function renderResult(st, c, res, before, snap){
       const delta = netWorth() - before;
       app.innerHTML = `<div class="card fade">
+        ${snap ? `<div class="top-back"><button class="btn ghost" id="btnBackChoiceTop" type="button">← 이전으로 · 다른 선택지 보기</button></div>` : ""}
+        ${probBannerHTML(res.prob, false)}
         <div class="kicker">${st.kicker} · 선택 미리보기</div>
         <h2>${c.t}</h2>
         <div class="result-hero">
@@ -2015,18 +2021,36 @@
         </div>
       </div>`;
       scrollTop(); updateHUD();
+      // 뒤로가기 범위: 이 미리보기 안에서의 되돌리기(상단·하단 버튼 모두 같은 동작)는 확정 전에만 허용한다.
+      // 확정(advance)된 뒤에는 다음 단계 화면에 이전 단계로 돌아가는 버튼 자체가 없고, 브라우저 뒤로가기는 종료 확인 팝업이 가로채므로 재선택·재판정은 불가능하다
+      let confirmed = false;
+      const goBackChoice = ()=>{
+        if (confirmed) return; // 확정 처리 후에는 되돌릴 수 없다
+        restoreState(snap);
+        renderStage();
+      };
       if (snap){
-        document.getElementById("btnBackChoice").onclick = ()=>{
-          restoreState(snap);
-          renderStage();
-        };
+        document.getElementById("btnBackChoice").onclick = goBackChoice;
+        const topBtn = document.getElementById("btnBackChoiceTop");
+        if (topBtn) topBtn.onclick = goBackChoice;
       }
-      document.getElementById("btnNext").onclick = advance;
+      document.getElementById("btnNext").onclick = ()=>{
+        if (confirmed) return;
+        confirmed = true; // 확정과 동시에 상·하단 뒤로가기를 모두 잠근다 (연타·중복 확정 방지)
+        const nb = document.getElementById("btnNext"); if (nb) nb.disabled = true;
+        const bb = document.getElementById("btnBackChoice"); if (bb) bb.disabled = true;
+        const tb = document.getElementById("btnBackChoiceTop"); if (tb) tb.disabled = true;
+        advance(res.prob || null);
+      };
     }
 
-    function advance(){
+    function advance(prob){
       S.lastYear = curYear();
       S.stageIdx++;
+      // 확률 판정 결과는 다음 단계(stageIdx)에 묶어 저장한다 — 다음 화면 상단 배너로 다시 보여주고, 그 단계가 지나면 사라진다
+      S.lastProb = prob ? Object.assign({}, prob, { stage:S.stageIdx }) : null;
+      // 턴 경계마다 히스토리 가드를 한 겹 더 쌓는다: 브라우저 뒤로가기는 항상 기존 종료 확인 팝업으로만 이어지고, 이전 단계 화면으로는 절대 돌아가지 않는다
+      try { history.pushState({ naeJibStageLock:S.stageIdx }, ""); } catch(e){}
       const next = STAGES[S.stageIdx];
       const toAge = next ? next.age : 60;
       S.settleLog = simulateYears(toAge);
@@ -2111,6 +2135,7 @@
       const settle = settleLogHTML();
       const own = !!S.house; // 상시 거래로 34세 전에 집을 산 경우도 유주택자로 취급한다 (round가 아니라 실제 보유 여부가 기준)
       app.innerHTML = `<div class="card fade">
+        ${stageProbBannerHTML()}
         <div class="kicker">${st.round===1 ? "34세 · 생애 최대의 선택" : "39세 · 주거 2막"} · ${year}년</div>
         <h2>${own ? "갈아탈 것인가, 머물 것인가" : "내 집 마련의 시간"}</h2>
         ${macroStrip(year)} ${shock}
@@ -2160,6 +2185,8 @@
     function housingResult(st, res, before){
       const delta = netWorth() - before;
       app.innerHTML = `<div class="card fade">
+        ${housingSnap ? `<div class="top-back"><button class="btn ghost" id="btnBackHousingTop" type="button">← 이전으로 · 다른 전략 고르기</button></div>` : ""}
+        ${probBannerHTML(pendingHousingProb, false)}
         <div class="kicker">${S.age}세 · 주거 선택 미리보기</div>
         <h2>${S.house ? aptById(S.house.aptId).name + ", 내 집이 되다" : "전세로 한 박자 쉬어가기"}</h2>
         <div class="result-hero"><div class="tiny muted" style="font-weight:700">순자산 변화</div>
@@ -2174,15 +2201,31 @@
         </div>
       </div>`;
       scrollTop(); updateHUD();
+      // 주거 미리보기 안에서의 되돌리기(상·하단 동일 동작)는 확정 전에만 허용 — 확정 후 다음 단계에서는 돌아올 수 없다
+      let hConfirmed = false;
+      const goBackHousing = ()=>{
+        if (hConfirmed) return;
+        const snap = housingSnap;
+        housingSnap = null;
+        pendingHousingProb = null; // 전략을 다시 고르면 청약 판정도 함께 되돌린다 (재판정 가능)
+        restoreState(snap);
+        renderHousingIntro(st);
+      };
       if (housingSnap){
-        document.getElementById("btnBackHousing").onclick = ()=>{
-          const snap = housingSnap;
-          housingSnap = null;
-          restoreState(snap);
-          renderHousingIntro(st);
-        };
+        document.getElementById("btnBackHousing").onclick = goBackHousing;
+        const hTop = document.getElementById("btnBackHousingTop");
+        if (hTop) hTop.onclick = goBackHousing;
       }
-      document.getElementById("btnNext").onclick = ()=>{ housingSnap = null; advance(); };
+      document.getElementById("btnNext").onclick = ()=>{
+        if (hConfirmed) return;
+        hConfirmed = true;
+        const nb = document.getElementById("btnNext"); if (nb) nb.disabled = true;
+        const hb = document.getElementById("btnBackHousing"); if (hb) hb.disabled = true;
+        const ht = document.getElementById("btnBackHousingTop"); if (ht) ht.disabled = true;
+        housingSnap = null;
+        const prob = pendingHousingProb; pendingHousingProb = null;
+        advance(prob);
+      };
     }
 
     /* ================= 추가 행동: 어느 단계에서든 집 사고팔기 =================
@@ -2201,6 +2244,7 @@
       const year = curYear();
       const own = !!S.house;
       app.innerHTML = `<div class="card fade">
+        <div class="top-back"><button class="btn ghost" id="btnExtraBackTop" type="button">← 거래 없이 이 단계로 돌아가기</button></div>
         <div class="kicker">${S.age}세 · 추가 행동 · ${year}년</div>
         <h2>집 사고팔기 (지도)</h2>
         ${macroStrip(year)}
@@ -2228,10 +2272,12 @@
       box.innerHTML = opts.map((o,i)=>`<button class="choice" data-i="${i}" type="button"><span class="t">${o.t} ${o.tag?`<span class="tag">${o.tag}</span>`:""}</span><span class="d">${o.d}</span></button>`).join("");
       box.querySelectorAll(".choice").forEach((b,i)=> b.onclick = ()=> opts[i].fn());
       document.getElementById("btnExtraBack").onclick = ()=>{ extraTradeSnap = null; renderStage(); };
+      document.getElementById("btnExtraBackTop").onclick = ()=>{ extraTradeSnap = null; renderStage(); };
     }
     function renderExtraTradeResult(st, res, before){
       const delta = netWorth() - before;
       app.innerHTML = `<div class="card fade">
+        ${extraTradeSnap ? `<div class="top-back"><button class="btn ghost" id="btnExtraUndoTop" type="button">← 거래 취소하고 돌아가기</button></div>` : ""}
         <div class="kicker">${S.age}세 · 집 사고팔기 미리보기</div>
         <h2>${S.house ? aptById(S.house.aptId).name + " — 거래를 마쳤습니다" : "거래를 마쳤습니다"}</h2>
         <div class="result-hero"><div class="tiny muted" style="font-weight:700">순자산 변화</div>
@@ -2247,12 +2293,16 @@
       </div>`;
       scrollTop(); updateHUD();
       if (extraTradeSnap){
-        document.getElementById("btnExtraUndo").onclick = ()=>{
+        // 거래 미리보기 안에서의 취소(상·하단 동일 동작)는 확정 전에만 허용 — 확정 후에는 같은 단계 화면으로만 돌아간다
+        const undoTrade = ()=>{
           const snap = extraTradeSnap;
           extraTradeSnap = null;
           restoreState(snap);
           renderStage();
         };
+        document.getElementById("btnExtraUndo").onclick = undoTrade;
+        const xu = document.getElementById("btnExtraUndoTop");
+        if (xu) xu.onclick = undoTrade;
       }
       document.getElementById("btnExtraDone").onclick = ()=>{ extraTradeSnap = null; renderStage(); };
     }
@@ -2274,6 +2324,8 @@
       let loanAmt = Math.max(0, Math.min(lim.maxLoan, total - funds));
       const step = 100; // 100만원 단위
       app.innerHTML = `<div class="card fade">
+        <div class="top-back"><button class="btn ghost" id="btnLoanBackTop" type="button">← 돌아가기</button></div>
+        ${cfg.topBanner || ""}
         <div class="kicker">${year}년 · 주택담보대출 계산</div>
         <h2>${cfg.heading}</h2>
         <p class="small muted">${cfg.sub}</p>
@@ -2371,7 +2423,9 @@
       document.getElementById("loanQNeed").onclick = ()=>{ loanAmt = Math.max(0, Math.min(lim.maxLoan, total - funds)); paint(); };
       document.getElementById("loanQMax").onclick = ()=>{ loanAmt = lim.maxLoan; paint(); };
       paint();
+      // 대출 화면→지도/이전 화면 뒤로가기는 선택지 안의 이동이라 허용한다 (상·하단 동일 동작)
       document.getElementById("btnLoanBack").onclick = cfg.back;
+      document.getElementById("btnLoanBackTop").onclick = cfg.back;
       confirmBtn.onclick = ()=>{
         if (confirmBtn.disabled) return;
         confirmBtn.disabled = true; // 확정 처리 중 재클릭으로 doBuy가 두 번 실행되는 것을 막는다
@@ -2437,6 +2491,7 @@
       const areaKeys = currentAreaKeys();
       const list = currentList();
       app.innerHTML = `<div class="card fade">
+        <div class="top-back"><button class="btn ghost" id="btnBackTop" type="button">${isExtra ? "거래 화면으로 돌아가기" : "전략 다시 고르기"}</button></div>
         <div class="kicker">${year}년 시세 · 전용 84㎡ 기준 (일부 단지는 카드에 표기한 가까운 평형 기준)</div>
         <h2>지도에서 고르는 내 집</h2>
         <p class="small muted">지도의 번호와 아래 카드가 연결됩니다. 학군·역세권·상품성 점수와 가격을 함께 보세요.
@@ -2563,7 +2618,8 @@
           refreshMapList(); // 정렬이 바뀌면 핀 순서도 카드 순번에 맞춰 다시 건다
         };
       });
-      document.getElementById("btnBack").onclick = ()=>{
+      // 지도→이전 화면 뒤로가기는 선택지 안의 이동이라 허용한다 (상·하단 버튼 동일 동작)
+      const goBackMap = ()=>{
         destroyActiveMap();
         if (isExtra){ // 추가 행동 거래: 갈아타기로 이미 매도했더라도 거래 전 상태로 되돌리고 거래 화면으로 돌아간다
           if (extraTradeSnap) restoreState(extraTradeSnap);
@@ -2572,9 +2628,12 @@
         }
         if (housingSnap){ const snap = housingSnap; housingSnap = null; restoreState(snap); } renderHousingIntro(st);
       };
+      document.getElementById("btnBack").onclick = goBackMap;
+      document.getElementById("btnBackTop").onclick = goBackMap;
     }
 
     function renderCheongyak(st){
+      pendingHousingProb = null; // 새 청약 화면에 들어올 때는 이전 판정 배너를 비운다 (판정은 단지를 고르는 순간 새로 굴린다)
       const year = curYear();
       const pts = cheongyakPoints();
       const options = [
@@ -2583,6 +2642,7 @@
         { name:"경기 신도시 분양", apt:"gwanggyo-sclass", cutoff:46, disc:0.85, desc:"광교 신축, 커트라인이 상대적으로 낮다" },
       ].filter(o => { const a = aptById(o.apt); return a.built <= year + 3 || a.anchors[0][0] <= year + 2; });
       app.innerHTML = `<div class="card fade">
+        <div class="top-back"><button class="btn ghost" id="btnBackTop" type="button">전략 다시 고르기</button></div>
         <div class="kicker">${year}년 · 청약 가점제</div>
         <h2>내 가점은 ${pts}점</h2>
         <p class="small muted">가점 구성 — 무주택기간 ${Math.min(32, Math.max(0,S.age-30)*2)}점 · 청약통장 ${S.tongjangStart ? Math.min(17, 2+(S.age-S.tongjangStart)) : 0}점 · 부양가족 ${Math.min(35,(S.married?5:0)+S.kids*5)}점 (총 84점 만점).
@@ -2603,12 +2663,15 @@
           const p = Math.max(0.05, Math.min(0.9, 0.12 + (pts - o.cutoff + 22)/100));
           const win = Math.random() < p;
           const before = netWorth();
+          // 청약 판정도 확률 배너 대상: 당첨이면 대출 화면 상단과 다음 단계 상단에, 낙첨이면 결과 화면과 다음 단계 상단에 표시한다
+          pendingHousingProb = { name:o.name + " 청약 도전", probText:"당첨 확률 약 " + Math.round(p*100) + "% (내 가점 " + pts + "점 · 커트라인 약 " + o.cutoff + "점)", success:win, resultText: win ? "당첨" : "낙첨",
+            nextText: win ? "다음 전개 — 분양대금 납부 화면에서 대출 금액을 정해 입주 절차를 진행합니다." : "다음 전개 — 매매로 전환해 지도에서 고르거나, 전세로 기다리며 청약 가점을 더 쌓을 수 있습니다." };
           if (win){
             const apt = aptById(o.apt);
             const price = Math.round(aptPriceAt(apt, year) * o.disc);
             // 당첨 확정 후 분양대금 납부: 매매와 같은 주담대 규칙(한도·금리·만기)으로 대출액을 직접 정한다.
             // 한도까지 받아도 모자라면 대출 화면 안에서 매매 전환·전세 대안을 제시한다
-            renderLoanBuy(st, { apt, price, label:"청약 당첨", priceLabel:"분양가 (전용 84㎡)",
+            renderLoanBuy(st, { apt, price, label:"청약 당첨", priceLabel:"분양가 (전용 84㎡)", topBanner: probBannerHTML(pendingHousingProb, false),
               heading: `${o.name} 당첨! 분양대금을 어떻게 낼까요?`,
               sub: `가점 ${pts}점으로 당첨됐습니다. 분양가 ${fmt(price)}는 같은 단지 시세 ${fmt(Math.round(aptPriceAt(apt,year)))}보다 저렴합니다. 현금이 부족하면 주택담보대출로 메울 수 있고, 금액은 직접 정할 수 있습니다.`,
               confirmLabel: "분양대금 납부하고 입주하기",
@@ -2616,7 +2679,7 @@
               fallback:"cheongyak",
               back: ()=>{ if (housingSnap){ const snap = housingSnap; housingSnap = null; restoreState(snap); } renderHousingIntro(st); } });
           } else {
-            app.innerHTML = `<div class="card fade"><div class="kicker">${year}년 · 청약 결과</div><h2>아쉽게도 낙첨</h2>
+            app.innerHTML = `<div class="card fade">${probBannerHTML(pendingHousingProb, false)}<div class="kicker">${year}년 · 청약 결과</div><h2>아쉽게도 낙첨</h2>
               <p>가점 ${pts}점으로는 커트라인 ${o.cutoff}점에 닿지 못했습니다. 청약은 떨어져도 통장 기간은 계속 쌓입니다. 이제 어떻게 할까요?</p>
               <div class="choices">
                 <button class="choice" id="fbBuy" type="button"><span class="t">매매로 전환 — 지도에서 고르기</span><span class="d">시세대로 사되, 단지는 직접 고릅니다.</span></button>
@@ -2628,7 +2691,9 @@
           }
         };
       });
-      document.getElementById("btnBack").onclick = ()=>{ if (housingSnap){ const snap = housingSnap; housingSnap = null; restoreState(snap); } renderHousingIntro(st); };
+      const goBackCheongyak = ()=>{ if (housingSnap){ const snap = housingSnap; housingSnap = null; restoreState(snap); } renderHousingIntro(st); };
+      document.getElementById("btnBack").onclick = goBackCheongyak;
+      document.getElementById("btnBackTop").onclick = goBackCheongyak;
     }
 
     /* ================= 은퇴 정산 ================= */
@@ -2700,6 +2765,7 @@
         return entries.sort((a,b)=> b.net - a.net);
       }
       app.innerHTML = `<div class="card fade">
+        ${stageProbBannerHTML()}
         <div class="kicker">${year}년 · 60세 은퇴 정산</div>
         <h2><span id="finalNickName">${escNick(S.nick)}</span>님의 인생, 정산합니다</h2>
         <div class="final-net">
